@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NivelWorks | Draw & Craft</title>
+  
+  <!-- Tailwind CSS CDN (설치 없이 디자인 적용) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Tailwind 설정 (에러 방지 및 커스텀 애니메이션) -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#05070e',
+          },
+          transitionDuration: {
+            '600': '600ms',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* 스크롤바 숨기기 및 기본 스타일 */
+    body { background-color: #05070e; color: #f1f5f9; overflow-x: hidden; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .selection-custom::selection { background-color: #0ea5e9; color: #0f172a; }
+    
+    /* 인트로 오버레이 전환 효과 */
+    #intro-overlay {
+      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body class="selection-custom">
+
+  <!-- 인트로 오버레이 -->
+  <div id="intro-overlay" class="fixed inset-0 z-50 overflow-hidden bg-[#05070e] flex flex-col items-center justify-between p-6 md:p-12 select-none">
+    <div class="w-full max-w-6xl flex items-center justify-between text-xs font-mono text-slate-400 tracking-widest">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+        <span>NIVELWORKS // SYSTEM INITIALIZATION</span>
+      </div>
+      <button onclick="skipIntro()" class="px-3 py-1.5 rounded-full border border-slate-800 hover:border-sky-500/50 hover:text-sky-300 transition-colors text-xs pointer-events-auto cursor-pointer">
+        SKIP INTRO →
+      </button>
+    </div>
+
+    <div class="relative flex flex-col items-center justify-center my-auto">
+      <div class="relative flex items-center justify-center scale-100">
+        <canvas id="intro-canvas" class="w-64 h-64 md:w-80 md:h-80" width="300" height="300"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <div id="intro-status-text" class="text-[11px] font-mono text-sky-400 tracking-[0.3em] mb-1">DRAW & CRAFT</div>
+          <div id="intro-percent" class="text-4xl md:text-6xl font-black tracking-tighter text-white tabular-nums">0%</div>
+        </div>
+      </div>
+
+      <div class="mt-4 overflow-hidden h-12 flex items-center">
+        <div id="intro-title" class="flex items-center justify-center gap-1 md:gap-2">
+          <!-- JS로 글자 채움 -->
+        </div>
+      </div>
+      <p id="intro-subtext" class="mt-3 text-xs md:text-sm text-sky-300/90 font-mono tracking-widest">ARCHITECTING THE NEXT STANDARD</p>
+    </div>
+
+    <div class="w-full max-w-6xl">
+      <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden mb-4">
+        <div id="intro-progress-bar" class="h-full bg-gradient-to-r from-sky-400 via-indigo-500 to-emerald-400 transition-all duration-75 ease-out" style="width: 0%"></div>
+      </div>
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-2 font-mono text-[11px] text-slate-500">
+        <div id="intro-logs" class="space-y-0.5 h-12 overflow-hidden flex flex-col justify-end">
+          <!-- JS로 로그 채움 -->
+        </div>
+        <div class="text-right text-slate-500">
+          STATUS: <span id="intro-status-badge" class="text-emerald-400">CALIBRATING</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 상단 프로그레스 바 -->
+  <div class="fixed top-0 left-0 right-0 z-40 h-0.5 bg-slate-900">
+    <div id="scroll-progress" class="h-full bg-gradient-to-r from-sky-400 via-indigo-500 to-emerald-400 transition-all duration-75" style="width: 0%"></div>
+  </div>
+
+  <!-- 헤더 -->
+  <header class="sticky top-0 z-30 backdrop-blur-xl bg-[#05070e]/80 border-b border-slate-800/80">
+    <div class="max-w-7xl mx-auto px-5 md:px-10 h-20 flex items-center justify-between">
+      <button onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" class="flex items-center gap-3 group text-left cursor-pointer">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 p-0.5 shadow-lg shadow-sky-500/20">
+          <div class="w-full h-full bg-[#05070e] rounded-[10px] flex items-center justify-center font-mono font-black text-sm tracking-tighter text-white group-hover:bg-transparent group-hover:text-slate-950 transition-colors">NV</div>
+        </div>
+        <div class="flex flex-col text-left">
+          <span class="text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            <span class="bind-teamName">NivelWorks</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+          </span>
+          <span class="text-[10px] font-mono text-slate-400 tracking-widest uppercase">
+            니벨웍스 STUDIO
+          </span>
+        </div>
+      </button>
+
+      <nav class="hidden md:flex items-center gap-1 p-1.5 rounded-full bg-slate-900/90 border border-slate-800" id="nav-menu">
+        <button onclick="scrollToSection('about', this)" class="nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer bg-sky-500 text-slate-950 shadow-sm">팀 소개 (About)</button>
+        <button onclick="scrollToSection('philosophy', this)" class="nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer text-slate-400 hover:text-white">엔지니어링 (DNA)</button>
+        <button onclick="scrollToSection('portfolio', this)" class="nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer text-slate-400 hover:text-white">포트폴리오 (공란)</button>
+        <button onclick="scrollToSection('contact', this)" class="nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer text-slate-400 hover:text-white">컨택트 (Contact)</button>
+      </nav>
+
+      <div class="flex items-center gap-2.5">
+        <button onclick="replayIntro()" title="입장 애니메이션 다시보기" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-sky-500/50 text-xs font-mono text-slate-300 hover:text-sky-300 transition-all cursor-pointer">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">입장 효과 재생</span>
+        </button>
+        <button onclick="toggleModal('rn-modal')" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-800 bg-slate-900/70 hover:border-indigo-500/50 text-xs font-mono text-indigo-300 transition-all cursor-pointer">
+          <i data-lucide="code-2" class="w-3.5 h-3.5"></i>
+          <span class="hidden lg:inline">RN 코드</span>
+        </button>
+        <button onclick="toggleEditor()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-500/15 border border-sky-500/40 hover:bg-sky-500/25 text-xs font-semibold text-sky-300 transition-all cursor-pointer">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">팀 정보 편집</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 실시간 편집기 UI -->
+  <div id="editor-panel" class="hidden bg-slate-900/95 border-b border-sky-500/30 py-6 px-5 md:px-10">
+    <div class="max-w-7xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sliders" class="w-4 h-4 text-sky-400"></i>
+          <h4 class="text-sm font-bold text-white">NivelWorks 팀 프로필 실시간 편집기</h4>
+        </div>
+        <button onclick="toggleEditor()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+          닫기 <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">팀 명칭</label>
+          <input type="text" id="input-teamName" value="NivelWorks" oninput="updateContent('teamName', this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">슬로건</label>
+          <input type="text" id="input-subTagline" value="아이디어를 선으로 그리고, 기술로 증명합니다. 차세대 웹 및 모바일 아키텍처 테크 콜렉티브." oninput="updateContent('subTagline', this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <div>
+          <label class="block text-[11px] font-mono text-slate-400 mb-1">이메일</label>
+          <input type="text" id="input-contactEmail" value="contact@nivelworks.dev" oninput="updateContent('contactEmail', this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 히어로 섹션 -->
+  <section class="relative min-h-[85vh] flex items-center justify-center overflow-hidden border-b border-slate-900">
+    <div class="pointer-events-none absolute -top-40 left-1/4 w-96 h-96 rounded-full bg-sky-500/10 blur-[130px]"></div>
+    <div class="pointer-events-none absolute bottom-10 right-1/4 w-96 h-96 rounded-full bg-indigo-500/10 blur-[130px]"></div>
+
+    <canvas id="hero-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+
+    <div class="relative z-10 max-w-6xl mx-auto px-5 md:px-10 py-24 text-center pointer-events-none">
+      <div class="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-xs font-mono text-sky-400 mb-8 shadow-lg pointer-events-auto">
+        <span class="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+        <span>TEAM NIVELWORKS // NEXT-GEN TECH COLLECTIVE</span>
+      </div>
+
+      <h1 class="text-5xl sm:text-7xl md:text-8xl font-black tracking-tighter leading-[1.05] text-white mb-6">
+        <span class="block bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400 bind-teamName">
+          NivelWorks
+        </span>
+        <span class="block text-2xl sm:text-4xl md:text-5xl font-extrabold mt-3 bg-clip-text text-transparent bg-gradient-to-r from-sky-400 via-indigo-400 to-emerald-400 bind-tagline">
+          Draw & Craft
+        </span>
+      </h1>
+
+      <p class="max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-slate-300 font-normal leading-relaxed mb-10 bind-subTagline">
+        아이디어를 선으로 그리고, 기술로 증명합니다. 차세대 웹 및 모바일 아키텍처 테크 콜렉티브.
+      </p>
+
+      <div class="flex flex-wrap items-center justify-center gap-4 pointer-events-auto">
+        <button onclick="scrollToSection('about')" class="px-7 py-4 rounded-2xl bg-gradient-to-r from-sky-400 to-indigo-500 text-slate-950 font-bold text-sm shadow-xl shadow-sky-500/20 flex items-center gap-2 hover:opacity-95 transition-opacity cursor-pointer">
+          <span>팀 소개 살펴보기</span>
+          <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+        </button>
+
+        <button onclick="scrollToSection('portfolio')" class="px-7 py-4 rounded-2xl border border-slate-700/80 bg-slate-900/80 hover:border-sky-400/50 text-white font-semibold text-sm flex items-center gap-2 transition-colors cursor-pointer">
+          <span>포트폴리오 (공란 확인)</span>
+          <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 팀 소개 섹션 -->
+  <section id="about" class="py-24 md:py-32 max-w-7xl mx-auto px-5 md:px-10">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+      <div>
+        <div class="text-xs font-mono text-sky-400 tracking-[0.25em] uppercase mb-3">01 // TEAM IDENTITY</div>
+        <h2 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">
+          아이디어를 선으로 그리고,<br />기술로 증명합니다.
+        </h2>
+      </div>
+      <p class="max-w-md text-sm md:text-base text-slate-400 leading-relaxed bind-description">
+        NivelWorks는 타협 없는 엔지니어링 표준과 감각적인 사용자 경험을 결합하여 세상에 없던 디지털 프로덕트를 설계합니다.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+      <!-- 틸트 카드 1 -->
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 md:p-10 cursor-default" data-color="rgba(56, 189, 248, 0.25)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 h-full pointer-events-none">
+          <div class="text-xs font-mono text-sky-400 mb-2">ETYMOLOGY PART A</div>
+          <div class="text-3xl md:text-4xl font-black text-white mb-4">DRAW <span class="text-lg font-normal text-slate-400">/ 그리다 · 설계</span></div>
+          <p class="text-slate-300 text-sm md:text-base leading-relaxed">비전과 아이디어를 명확한 아키텍처 스케치와 구조로 그려내는 창의적 설계를 의미합니다.</p>
+        </div>
+      </div>
+      <!-- 틸트 카드 2 -->
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 md:p-10 cursor-default" data-color="rgba(129, 140, 248, 0.25)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 h-full pointer-events-none">
+          <div class="text-xs font-mono text-indigo-400 mb-2">ETYMOLOGY PART B</div>
+          <div class="text-3xl md:text-4xl font-black text-white mb-4">WORKS <span class="text-lg font-normal text-slate-400">/ 엔지니어링 · 실행</span></div>
+          <p class="text-slate-300 text-sm md:text-base leading-relaxed">그려진 설계도가 실제로 동작하는 소프트웨어 제품으로 완벽하게 구현되는 메이커 정신을 상징합니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 핵심 도메인 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 flex flex-col justify-between" data-color="rgba(56, 189, 248, 0.22)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 pointer-events-none">
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-xs font-mono text-slate-500">SYS_01</span>
+            <div class="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center"><i data-lucide="cpu" class="w-6 h-6 text-sky-400"></i></div>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-3">Universal Architecture</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">React Native 및 Web 플랫폼 전반을 아우르는 고성능 크로스 플랫폼 아키텍처 설계.</p>
+        </div>
+        <div class="relative z-10 mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-sky-400 pointer-events-none">
+          <span>CORE CAPABILITY</span><span>ACTIVE</span>
+        </div>
+      </div>
+      
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 flex flex-col justify-between" data-color="rgba(56, 189, 248, 0.22)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 pointer-events-none">
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-xs font-mono text-slate-500">SYS_02</span>
+            <div class="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center"><i data-lucide="sparkles" class="w-6 h-6 text-indigo-400"></i></div>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-3">Kinetic Motion Experience</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">사용자의 모든 인터랙션에 반응하는 60FPS 부드러운 물리 모션과 시네마틱 UI 인터페이스.</p>
+        </div>
+        <div class="relative z-10 mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-sky-400 pointer-events-none">
+          <span>CORE CAPABILITY</span><span>ACTIVE</span>
+        </div>
+      </div>
+
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 flex flex-col justify-between" data-color="rgba(56, 189, 248, 0.22)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 pointer-events-none">
+          <div class="flex items-center justify-between mb-6">
+            <span class="text-xs font-mono text-slate-500">SYS_03</span>
+            <div class="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center"><i data-lucide="layers" class="w-6 h-6 text-emerald-400"></i></div>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-3">Zero-Compromise Craft</h3>
+          <p class="text-sm text-slate-400 leading-relaxed">불필요한 가상 데이터와 허세를 배제하고 철저하게 검증된 코드와 데이터만으로 구현.</p>
+        </div>
+        <div class="relative z-10 mt-8 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-sky-400 pointer-events-none">
+          <span>CORE CAPABILITY</span><span>ACTIVE</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 엔지니어링 철학 섹션 -->
+  <section id="philosophy" class="py-24 md:py-32 border-y border-slate-900 bg-gradient-to-b from-[#05070e] via-[#080d1a] to-[#05070e]">
+    <div class="max-w-7xl mx-auto px-5 md:px-10">
+      <div class="mb-14">
+        <div class="text-xs font-mono text-indigo-400 tracking-[0.25em] uppercase mb-3">02 // ENGINEERING DNA & WORKFLOW</div>
+        <h2 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">NivelWorks가 문제를 해결하는 방식</h2>
+        <p class="text-slate-400 text-sm md:text-base mt-3 max-w-2xl">단계를 클릭하여 설계 프로세스를 확인하세요.</p>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+        <!-- 탭 메뉴 -->
+        <div class="lg:col-span-5 flex flex-col justify-between space-y-3" id="philosophy-tabs">
+          <button onclick="switchTab(0)" class="tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-sky-500/60 bg-gradient-to-r from-sky-500/15 to-indigo-500/5 shadow-lg shadow-sky-950/30">
+            <div class="tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-sky-400 text-slate-950">01</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-mono tracking-widest text-sky-400">ALIGNMENT</span><i data-lucide="chevron-right" class="tab-icon w-4 h-4 transition-transform translate-x-1 text-sky-400"></i></div>
+              <h4 class="text-base font-bold text-white mt-1">기준 수립</h4>
+            </div>
+          </button>
+          <button onclick="switchTab(1)" class="tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-slate-800/80 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/60">
+            <div class="tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-slate-800 text-slate-400">02</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-mono tracking-widest text-sky-400">ARCHITECTURE</span><i data-lucide="chevron-right" class="tab-icon w-4 h-4 transition-transform text-slate-600"></i></div>
+              <h4 class="text-base font-bold text-white mt-1">구조 설계</h4>
+            </div>
+          </button>
+          <button onclick="switchTab(2)" class="tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-slate-800/80 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/60">
+            <div class="tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-slate-800 text-slate-400">03</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-mono tracking-widest text-sky-400">EXECUTION</span><i data-lucide="chevron-right" class="tab-icon w-4 h-4 transition-transform text-slate-600"></i></div>
+              <h4 class="text-base font-bold text-white mt-1">정밀 구현</h4>
+            </div>
+          </button>
+          <button onclick="switchTab(3)" class="tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-slate-800/80 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/60">
+            <div class="tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-slate-800 text-slate-400">04</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between"><span class="text-xs font-mono tracking-widest text-sky-400">VERIFICATION</span><i data-lucide="chevron-right" class="tab-icon w-4 h-4 transition-transform text-slate-600"></i></div>
+              <h4 class="text-base font-bold text-white mt-1">엄격한 검증</h4>
+            </div>
+          </button>
+        </div>
+
+        <!-- 탭 내용 -->
+        <div class="lg:col-span-7">
+          <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden h-full p-8 md:p-10 flex flex-col justify-between" data-color="rgba(56, 189, 248, 0.22)">
+            <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+            <div class="relative z-10 h-full flex flex-col justify-between pointer-events-none">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-5 mb-6">
+                <div>
+                  <span id="tab-subtitle" class="text-xs font-mono text-sky-400 tracking-widest block">NIVELWORKS PROCESS // STEP 01</span>
+                  <h3 id="tab-title" class="text-2xl font-bold text-white mt-1">ALIGNMENT — 기준 수립</h3>
+                </div>
+                <div id="tab-metrics" class="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700 font-mono text-xs text-slate-300">
+                  NOISE FILTER 100%
+                </div>
+              </div>
+
+              <div class="my-4 p-6 rounded-2xl bg-slate-950/80 border border-slate-800/90 min-h-[210px] flex flex-col items-center justify-center relative overflow-hidden" id="tab-visual-container">
+                <!-- JS에서 채움 -->
+              </div>
+
+              <p id="tab-desc" class="text-slate-300 text-sm md:text-base leading-relaxed mt-4">
+                프로덕트의 본질을 흐리는 불필요한 복잡성과 요소를 제거하고 명확한 엔지니어링 기준(Draw)을 정의합니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 포트폴리오 섹션 -->
+  <section id="portfolio" class="py-24 md:py-32 max-w-7xl mx-auto px-5 md:px-10">
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+      <div>
+        <div class="text-xs font-mono text-sky-400 tracking-[0.25em] uppercase mb-3">03 // PORTFOLIO & ARCHIVE</div>
+        <h2 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">Portfolio</h2>
+      </div>
+      <div class="text-xs font-mono text-slate-400 bg-slate-900/90 border border-slate-800 px-4 py-2 rounded-xl">
+        * 요청에 따라 가상의 성과 없이 공란으로 유지된 영역입니다.
+      </div>
+    </div>
+    
+    <div class="w-full">
+      <div id="blueprint-area" class="relative w-full rounded-3xl border border-dashed border-slate-700/80 bg-[#070b14]/90 p-8 md:p-14 overflow-hidden transition-colors hover:border-sky-500/40" style="background-image: radial-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px), linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px); background-size: 24px 24px, 96px 96px, 96px 96px;">
+        
+        <div id="crosshair-x" class="pointer-events-none absolute top-0 bottom-0 w-px bg-sky-400/20 hidden"></div>
+        <div id="crosshair-y" class="pointer-events-none absolute left-0 right-0 h-px bg-sky-400/20 hidden"></div>
+        <div id="crosshair-label" class="pointer-events-none absolute px-2 py-0.5 rounded bg-slate-900/90 border border-sky-500/30 text-[10px] font-mono text-sky-400 hidden">
+          X:0 Y:0 // BLANK_CANVAS
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-8 mb-8 border-b border-slate-800/80 text-xs font-mono text-slate-400 relative z-10">
+          <div class="flex items-center gap-2.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400/80"></span>
+            <span>PORTFOLIO REPOSITORY STATUS: 0 RECORDS</span>
+          </div>
+          <div class="px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
+            VERIFIED AUTHENTIC MODE (NO MOCK DATA)
+          </div>
+        </div>
+
+        <div class="max-w-2xl mx-auto text-center py-8 relative z-10 pointer-events-none">
+          <div class="w-16 h-16 rounded-2xl border border-dashed border-sky-500/40 bg-sky-500/5 flex items-center justify-center mx-auto mb-6 text-sky-400">
+            <i data-lucide="compass" class="w-8 h-8 animate-pulse"></i>
+          </div>
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-800/70 border border-slate-700 text-xs font-mono text-sky-300 mb-4">
+            PORTFOLIO SECTION — INTENTIONALLY BLANK
+          </div>
+          <h3 class="text-2xl md:text-3xl font-bold text-white tracking-tight mb-4">
+            현재 등록된 포트폴리오가 없습니다 (공란)
+          </h3>
+          <p class="text-slate-400 text-sm md:text-base leading-relaxed mb-8">
+            NivelWorks는 가상의 성과나 임의의 데모 프로젝트를 기재하지 않습니다.
+            <br class="hidden md:inline" />
+            첫 번째 공식 프로덕트와 실제 엔지니어링 기록이 완성되는 순간 이곳에 투명하게 기록됩니다.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-4 relative z-10">
+          <!-- 빈 슬롯들 -->
+          <button class="slot-btn text-left group relative rounded-2xl border border-dashed p-6 transition-all duration-300 cursor-pointer border-slate-800 hover:border-slate-700 bg-slate-950/50">
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 mb-10">
+              <span>SLOT_01</span>
+              <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">공란 (EMPTY)</span>
+            </div>
+            <div class="h-24 flex flex-col items-center justify-center border border-dashed border-slate-800/70 rounded-xl mb-6 bg-slate-900/20">
+              <span class="text-xs font-mono text-slate-600 tracking-widest">[ NO DATA ASSIGNED ]</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-slate-400">PROJECT ARCHIVE #01</span>
+              <span class="text-slate-600">EMPTY / UNASSIGNED</span>
+            </div>
+          </button>
+          <button class="slot-btn text-left group relative rounded-2xl border border-dashed p-6 transition-all duration-300 cursor-pointer border-slate-800 hover:border-slate-700 bg-slate-950/50">
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 mb-10">
+              <span>SLOT_02</span>
+              <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">공란 (EMPTY)</span>
+            </div>
+            <div class="h-24 flex flex-col items-center justify-center border border-dashed border-slate-800/70 rounded-xl mb-6 bg-slate-900/20">
+              <span class="text-xs font-mono text-slate-600 tracking-widest">[ NO DATA ASSIGNED ]</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-slate-400">PROJECT ARCHIVE #02</span>
+              <span class="text-slate-600">EMPTY / UNASSIGNED</span>
+            </div>
+          </button>
+          <button class="slot-btn text-left group relative rounded-2xl border border-dashed p-6 transition-all duration-300 cursor-pointer border-slate-800 hover:border-slate-700 bg-slate-950/50">
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 mb-10">
+              <span>SLOT_03</span>
+              <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">공란 (EMPTY)</span>
+            </div>
+            <div class="h-24 flex flex-col items-center justify-center border border-dashed border-slate-800/70 rounded-xl mb-6 bg-slate-900/20">
+              <span class="text-xs font-mono text-slate-600 tracking-widest">[ NO DATA ASSIGNED ]</span>
+            </div>
+            <div class="flex items-center justify-between text-xs font-mono">
+              <span class="text-slate-400">PROJECT ARCHIVE #03</span>
+              <span class="text-slate-600">EMPTY / UNASSIGNED</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 컨택트 섹션 -->
+  <section id="contact" class="py-20 border-t border-slate-900 bg-[#04060b]">
+    <div class="max-w-7xl mx-auto px-5 md:px-10">
+      <div class="tilt-card relative rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl overflow-hidden p-8 md:p-14 bg-gradient-to-br from-slate-900/90 via-slate-900/60 to-sky-950/30" data-color="rgba(56, 189, 248, 0.15)">
+        <div class="spotlight pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-300"></div>
+        <div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pointer-events-none">
+          <div class="lg:col-span-8">
+            <div class="text-xs font-mono text-sky-400 tracking-widest mb-3">04 // CONNECT WITH NIVELWORKS</div>
+            <h2 class="text-3xl md:text-4xl font-extrabold text-white mb-4">새로운 기준을 함께 만들어갈 준비가 되어 있습니다.</h2>
+            <p class="text-slate-400 text-sm md:text-base max-w-xl leading-relaxed">협업 제안은 언제든 환영합니다.</p>
+          </div>
+          <div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3 justify-end pointer-events-auto">
+            <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-3">
+              <i data-lucide="mail" class="w-5 h-5 text-sky-400 shrink-0"></i>
+              <div class="overflow-hidden">
+                <div class="text-[10px] font-mono text-slate-500">OFFICIAL EMAIL</div>
+                <div class="text-sm font-mono text-white truncate bind-contactEmail">contact@nivelworks.dev</div>
+              </div>
+            </div>
+            <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center gap-3">
+              <i data-lucide="globe" class="w-5 h-5 text-indigo-400 shrink-0"></i>
+              <div>
+                <div class="text-[10px] font-mono text-slate-500">LOCATION</div>
+                <div class="text-sm font-mono text-white">Seoul / Global</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="mt-14 pt-8 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
+        <div>© 2024 <span class="bind-teamName">NivelWorks</span>. ALL RIGHTS RESERVED.</div>
+        <div class="flex items-center gap-4">
+          <span>BUILT WITH NATIVE JAVASCRIPT ARCHITECTURE</span>
+          <span class="text-sky-400">● ZERO FAKE METRICS</span>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+  <!-- 리액트 네이티브 코드 모달 -->
+  <div id="rn-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 hidden opacity-0 transition-opacity duration-300">
+    <div class="w-full max-w-3xl rounded-3xl border border-slate-800 bg-slate-950 p-6 md:p-8 shadow-2xl transform transition-transform scale-95" id="rn-modal-content">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <i data-lucide="smartphone" class="w-5 h-5 text-sky-400"></i>
+          <h3 class="text-lg font-bold text-white">React Native (Expo / CLI) 네이티브 코드 추출</h3>
+        </div>
+        <button onclick="toggleModal('rn-modal')" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="relative rounded-2xl bg-slate-900 border border-slate-800 p-4 max-h-80 overflow-y-auto font-mono text-xs text-slate-300 mt-4">
+        <pre id="rn-code-snippet" class="whitespace-pre-wrap"></pre>
+      </div>
+      <div class="mt-5 flex justify-end gap-3">
+        <button onclick="copyRnCode()" id="copy-btn" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition-colors cursor-pointer">
+          <i data-lucide="copy" class="w-4 h-4" id="copy-icon"></i>
+          <span id="copy-text">React Native 코드 복사</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 자바스크립트 로직 -->
+  <script>
+    // 아이콘 초기화
+    lucide.createIcons();
+
+    // 1. 상태 및 데이터 관리
+    const workflowSteps = [
+      { step: '01', name: 'ALIGNMENT', korTitle: '기준 수립', metricsLabel: 'NOISE FILTER 100%', detail: '프로덕트의 본질을 흐리는 불필요한 복잡성과 요소를 제거하고 명확한 엔지니어링 기준(Draw)을 정의합니다.', visual: '<div class="w-full max-w-md space-y-4 text-center"><div class="text-xs font-mono text-slate-400">NOISE FILTERING &gt;&gt; CORE ESSENCE LOCKED</div><div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-400 flex items-center justify-center text-sky-300 font-mono font-bold mx-auto shadow-lg shadow-sky-500/20">DRAW</div><p class="text-xs font-mono text-slate-400">불필요한 복잡성을 제거하고 프로덕트의 핵심 기준점을 설정합니다.</p></div>' },
+      { step: '02', name: 'ARCHITECTURE', korTitle: '구조 설계', metricsLabel: 'MODULAR SYNC', detail: '확장성과 유지보수성이 극대화된 모듈러 컴포넌트 구조와 상태 관리 시스템을 설계합니다.', visual: '<div class="w-full max-w-md flex flex-col items-center"><div class="grid grid-cols-3 gap-3 w-full"><div class="p-3 rounded-xl border border-indigo-500/40 bg-indigo-950/20 text-center"><div class="text-[10px] font-mono text-indigo-400 mb-1">NODE 01</div><div class="text-xs font-semibold text-white">UI Layer</div></div><div class="p-3 rounded-xl border border-indigo-500/40 bg-indigo-950/20 text-center"><div class="text-[10px] font-mono text-indigo-400 mb-1">NODE 02</div><div class="text-xs font-semibold text-white">State Engine</div></div><div class="p-3 rounded-xl border border-indigo-500/40 bg-indigo-950/20 text-center"><div class="text-[10px] font-mono text-indigo-400 mb-1">NODE 03</div><div class="text-xs font-semibold text-white">Core Logic</div></div></div><div class="mt-4 px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-400/50 text-xs font-mono text-sky-300">Unified NivelWorks Architecture</div></div>' },
+      { step: '03', name: 'EXECUTION', korTitle: '정밀 구현', metricsLabel: '60 FPS KINETIC', detail: '타협 없는 코드 품질과 디테일한 모션 인터랙션을 통해 완벽한 사용자 경험을 빌드합니다.', visual: '<div class="w-full font-mono text-xs space-y-2 text-left bg-slate-900/90 p-4 rounded-xl border border-slate-800"><div class="text-slate-500">// Universal React Native &amp; Web Motion Engine</div><div><span class="text-pink-400">const</span> <span class="text-sky-300">Engine</span> = () =&gt; {</div><div class="pl-4 text-emerald-400">useKineticSpring({ stiffness: 180 });</div><div>};</div></div>' },
+      { step: '04', name: 'VERIFICATION', korTitle: '엄격한 검증', metricsLabel: 'ZERO MOCK ERROR', detail: '실제 프로덕션 환경에서의 성능과 안정성을 최종 검증하고 배포합니다.', visual: '<div class="flex flex-col items-center justify-center space-y-3"><div class="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-300"><i data-lucide="shield-check" class="w-6 h-6"></i></div><div class="text-sm font-bold text-white">Zero-Compromise Release</div></div>' }
+    ];
+
+    // 2. 인트로 오버레이 애니메이션
+    let introCancelled = false;
+    let introAnimId, ringAnimId;
+    function runIntroSequence() {
+      introCancelled = false;
+      const overlay = document.getElementById('intro-overlay');
+      overlay.style.display = 'flex';
+      overlay.style.opacity = '1';
+      overlay.style.pointerEvents = 'auto';
+
+      const bootMessages = [
+        'INITIALIZING NIVELWORKS CORE ENGINE...',
+        'LOADING JAVASCRIPT UNIVERSAL RUNTIME...',
+        'CALIBRATING KINETIC MOTION MATRIX [60FPS]...',
+        'VERIFYING PORTFOLIO STATE: [AUTHENTIC_EMPTY_CANVAS]...',
+        'ESTABLISHING HORIZON LEVEL (DRAW = 1.000)...',
+        'SYSTEM READY. ENTERING HORIZON.'
+      ];
+      
+      const startTime = Date.now();
+      const totalDuration = 2600;
+
+      // 캔버스 링 애니메이션
+      const canvas = document.getElementById('intro-canvas');
+      const ctx = canvas.getContext('2d');
+      let angle = 0;
+      function renderRing() {
+        if(introCancelled) return;
+        ctx.clearRect(0, 0, 300, 300);
+        const cx = 150, cy = 150;
+        angle += 0.025;
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy, 105, 0, Math.PI * 2); ctx.stroke();
+
+        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(cx, cy, 105, angle, angle + Math.PI * 0.65); ctx.stroke();
+
+        ctx.strokeStyle = '#818cf8'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, 82, -angle * 1.35, -angle * 1.35 + Math.PI * 0.8); ctx.stroke();
+
+        for (let i = 0; i < 6; i++) {
+          const theta = angle * 0.9 + (i * Math.PI) / 3;
+          const r = 82 + Math.sin(angle * 2.2 + i) * 10;
+          const nx = cx + Math.cos(theta) * r;
+          const ny = cy + Math.sin(theta) * r;
+          ctx.fillStyle = i % 2 === 0 ? '#38bdf8' : '#818cf8';
+          ctx.beginPath(); ctx.arc(nx, ny, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        ringAnimId = requestAnimationFrame(renderRing);
+      }
+      renderRing();
+
+      // 프로그레스 애니메이션
+      const titleDiv = document.getElementById('intro-title');
+      titleDiv.innerHTML = 'NIVELWORKS'.split('').map((char, i) => `<span class="inline-block text-2xl md:text-4xl font-extrabold tracking-[0.22em] transition-all duration-600 ease-out text-white transform translate-y-[120%] opacity-0" style="transition-delay: ${i*30}ms" id="char-${i}">${char}</span>`).join('');
+
+      function updateProgress() {
+        if(introCancelled) return;
+        const elapsed = Date.now() - startTime;
+        const rawProgress = Math.min(elapsed / totalDuration, 1.0);
+        const easedProgress = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+        const currentPercent = Math.min(100, Math.floor(easedProgress * 100));
+
+        document.getElementById('intro-percent').innerText = currentPercent + '%';
+        document.getElementById('intro-progress-bar').style.width = currentPercent + '%';
+        
+        const logIndex = Math.floor((currentPercent / 100) * (bootMessages.length - 1));
+        const logsToShow = bootMessages.slice(0, logIndex + 1).slice(-2);
+        document.getElementById('intro-logs').innerHTML = logsToShow.map(log => `<div class="text-slate-400 flex items-center gap-2"><span class="text-sky-400">&gt;</span> ${log}</div>`).join('');
+
+        if(currentPercent >= 15) {
+          for(let i=0; i<10; i++) {
+            const el = document.getElementById(`char-${i}`);
+            if(el) { el.classList.remove('translate-y-[120%]', 'opacity-0'); el.classList.add('translate-y-0', 'opacity-100'); }
+          }
+        }
+
+        if(currentPercent >= 100) {
+          document.getElementById('intro-status-text').innerText = 'READY';
+          document.getElementById('intro-subtext').innerText = 'ENTERING HORIZON...';
+          document.getElementById('intro-status-badge').innerText = 'COMPLETE [100%]';
+          document.getElementById('intro-status-badge').className = 'text-sky-400 font-bold';
+        }
+
+        if (rawProgress < 1.0) {
+          introAnimId = requestAnimationFrame(updateProgress);
+        } else {
+          setTimeout(() => { if(!introCancelled) skipIntro(); }, 1500);
+        }
+      }
+      introAnimId = requestAnimationFrame(updateProgress);
+    }
+
+    function skipIntro() {
+      introCancelled = true;
+      cancelAnimationFrame(introAnimId);
+      cancelAnimationFrame(ringAnimId);
+      const overlay = document.getElementById('intro-overlay');
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+      setTimeout(() => { overlay.style.display = 'none'; }, 1000);
+    }
+
+    function replayIntro() { runIntroSequence(); }
+
+    // 시작 시 인트로 실행
+    window.onload = () => {
+      runIntroSequence();
+      initHeroCanvas();
+      switchTab(0);
+      updateRnSnippet();
+    };
+
+    // 3. 메인 히어로 캔버스 파티클 효과
+    function initHeroCanvas() {
+      const canvas = document.getElementById('hero-canvas');
+      const ctx = canvas.getContext('2d');
+      let mouse = { x: -1000, y: -1000, radius: 160, pulse: 0 };
+      let particles = [];
+      let animId;
+
+      function resize() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      for (let i = 0; i < 65; i++) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          vx: (Math.random() - 0.5) * 0.7,
+          vy: (Math.random() - 0.5) * 0.7,
+          size: Math.random() * 2.2 + 1,
+          color: Math.random() > 0.5 ? '#38bdf8' : '#818cf8'
+        });
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (mouse.pulse > 0) mouse.pulse -= 0.04;
+
+        for (let i = 0; i < particles.length; i++) {
+          let p = particles[i];
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+          const dx = mouse.x - p.x;
+          const dy = mouse.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < mouse.radius) {
+            const force = (mouse.radius - dist) / mouse.radius;
+            const pushFactor = mouse.pulse > 0 ? -4.5 : 1.2;
+            p.x -= (dx / dist) * force * pushFactor;
+            p.y -= (dy / dist) * force * pushFactor;
+          }
+
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+
+          for (let j = i + 1; j < particles.length; j++) {
+            const p2 = particles[j];
+            const ldist = Math.sqrt(Math.pow(p.x - p2.x, 2) + Math.pow(p.y - p2.y, 2));
+            if (ldist < 130) {
+              ctx.strokeStyle = `rgba(129, 140, 248, ${(1 - ldist / 130) * 0.28})`;
+              ctx.lineWidth = 0.8;
+              ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+            }
+          }
+        }
+        animId = requestAnimationFrame(render);
+      }
+      render();
+
+      const moveHandler = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        mouse.y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      };
+      canvas.addEventListener('mousemove', moveHandler);
+      canvas.addEventListener('touchmove', moveHandler);
+      canvas.addEventListener('mouseleave', () => { mouse.x = -1000; mouse.y = -1000; });
+      canvas.addEventListener('mousedown', () => mouse.pulse = 1);
+    }
+
+    // 4. 틸트(Tilt) 카드 효과
+    document.querySelectorAll('.tilt-card').forEach(card => {
+      const spotlight = card.querySelector('.spotlight');
+      const accentColor = card.getAttribute('data-color') || 'rgba(56, 189, 248, 0.22)';
+      
+      card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const rotateX = ((y - rect.height / 2) / (rect.height / 2)) * -6;
+        const rotateY = ((x - rect.width / 2) / (rect.width / 2)) * 6;
+        
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        card.style.transition = 'transform 0.08s ease-out';
+        
+        if(spotlight) {
+          spotlight.style.opacity = '1';
+          spotlight.style.background = `radial-gradient(420px circle at ${x}px ${y}px, ${accentColor}, transparent 45%)`;
+        }
+      });
+      
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
+        card.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+        if(spotlight) spotlight.style.opacity = '0';
+      });
+    });
+
+    // 5. 스크롤 및 네비게이션
+    window.addEventListener('scroll', () => {
+      const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (window.scrollY / totalScroll) * 100;
+      document.getElementById('scroll-progress').style.width = `${progress}%`;
+    });
+
+    function scrollToSection(id, btn) {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      if(btn) {
+        document.querySelectorAll('.nav-btn').forEach(b => {
+          b.className = 'nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer text-slate-400 hover:text-white';
+        });
+        btn.className = 'nav-btn px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer bg-sky-500 text-slate-950 shadow-sm';
+      }
+    }
+
+    // 6. 편집기 토글 및 데이터 바인딩
+    function toggleEditor() {
+      const el = document.getElementById('editor-panel');
+      el.classList.toggle('hidden');
+    }
+
+    function updateContent(key, value) {
+      document.querySelectorAll(`.bind-${key}`).forEach(el => el.innerText = value);
+      updateRnSnippet(); // 코드 수정 시 모달의 코드도 자동 업데이트
+    }
+
+    // 7. 모달 토글 및 복사
+    function toggleModal(id) {
+      const el = document.getElementById(id);
+      if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        setTimeout(() => { el.classList.remove('opacity-0'); el.querySelector('div').classList.remove('scale-95'); }, 10);
+      } else {
+        el.classList.add('opacity-0');
+        el.querySelector('div').classList.add('scale-95');
+        setTimeout(() => el.classList.add('hidden'), 300);
+      }
+    }
+
+    function updateRnSnippet() {
+      const tName = document.getElementById('input-teamName').value;
+      const tSub = document.getElementById('input-subTagline').value;
+      const code = `import React from 'react';
+import { StyleSheet, View, Text, ScrollView, SafeAreaView } from 'react-native';
+
+export default function NivelWorksApp() {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#05070e' }}>
+      <ScrollView contentContainerStyle={{ padding: 24 }}>
+        <Text style={{ color: '#ffffff', fontSize: 32, fontWeight: 'bold' }}>${tName}</Text>
+        <Text style={{ color: '#94a3b8', fontSize: 16 }}>${tSub}</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}`;
+      document.getElementById('rn-code-snippet').innerText = code;
+    }
+
+    function copyRnCode() {
+      const code = document.getElementById('rn-code-snippet').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        document.getElementById('copy-text').innerText = '복사 완료!';
+        setTimeout(() => { document.getElementById('copy-text').innerText = 'React Native 코드 복사'; }, 2000);
+      });
+    }
+
+    // 8. 철학(Philosophy) 탭 로직
+    function switchTab(idx) {
+      const data = workflowSteps[idx];
+      document.getElementById('tab-subtitle').innerText = `NIVELWORKS PROCESS // STEP ${data.step}`;
+      document.getElementById('tab-title').innerText = `${data.name} — ${data.korTitle}`;
+      document.getElementById('tab-metrics').innerText = data.metricsLabel;
+      document.getElementById('tab-desc').innerText = data.detail;
+      document.getElementById('tab-visual-container').innerHTML = data.visual;
+      lucide.createIcons();
+
+      const btns = document.querySelectorAll('.tab-btn');
+      btns.forEach((btn, i) => {
+        const badge = btn.querySelector('.tab-badge');
+        const icon = btn.querySelector('.tab-icon');
+        if (i === idx) {
+          btn.className = 'tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-sky-500/60 bg-gradient-to-r from-sky-500/15 to-indigo-500/5 shadow-lg shadow-sky-950/30';
+          badge.className = 'tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-sky-400 text-slate-950';
+          icon.className = 'tab-icon w-4 h-4 transition-transform translate-x-1 text-sky-400';
+        } else {
+          btn.className = 'tab-btn w-full text-left p-5 rounded-2xl border transition-all duration-300 flex items-start gap-4 cursor-pointer border-slate-800/80 bg-slate-900/30 hover:border-slate-700 hover:bg-slate-900/60';
+          badge.className = 'tab-badge px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-slate-800 text-slate-400';
+          icon.className = 'tab-icon w-4 h-4 transition-transform text-slate-600';
+        }
+      });
+    }
+
+    // 9. 포트폴리오 블루프린트 마우스 추적
+    const bpArea = document.getElementById('blueprint-area');
+    const crossX = document.getElementById('crosshair-x');
+    const crossY = document.getElementById('crosshair-y');
+    const crossL = document.getElementById('crosshair-label');
+
+    bpArea.addEventListener('mousemove', (e) => {
+      const rect = bpArea.getBoundingClientRect();
+      const x = Math.round(e.clientX - rect.left);
+      const y = Math.round(e.clientY - rect.top);
+      
+      crossX.style.display = 'block'; crossX.style.left = x + 'px';
+      crossY.style.display = 'block'; crossY.style.top = y + 'px';
+      crossL.style.display = 'block'; crossL.style.left = (x + 12) + 'px'; crossL.style.top = (y + 12) + 'px';
+      crossL.innerText = `X:${x} Y:${y} // BLANK_CANVAS`;
+    });
+    bpArea.addEventListener('mouseleave', () => {
+      crossX.style.display = 'none'; crossY.style.display = 'none'; crossL.style.display = 'none';
+    });
+
+    document.querySelectorAll('.slot-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.slot-btn').forEach(b => { b.classList.remove('border-sky-400/60', 'bg-sky-950/20'); b.classList.add('border-slate-800', 'bg-slate-950/50'); });
+        this.classList.remove('border-slate-800', 'bg-slate-950/50');
+        this.classList.add('border-sky-400/60', 'bg-sky-950/20');
+      });
+    });
+
+  </script>
+</body>
+</html>
+```eof
+
+### 🚀 HTML 파일로 깃허브 페이지에 배포하는 방법
+
+설치나 복잡한 명령어는 이제 필요 없습니다! 
+기존에 `React_Setup_Guide.md`로 안내해 드린 내용은 무시하시고, 처음에 알려드렸던 **"웹사이트 배포 구조 및 가이드"**의 5단계를 따라 하시면 됩니다. 
+
+1. VS Code를 열고 빈 폴더에 위 코드를 복사하여 `index.html`로 저장합니다.
+2. 터미널 창을 열고 아래 명령어를 순서대로 입력하세요.
+   
+```bash
+   git init
+   git add .
+   git commit -m "최초 배포"
+   
