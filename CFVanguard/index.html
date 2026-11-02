@@ -1,9 +1,359 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-<title>test</title>
+    <meta charset="UTF-8">
+    <!-- 모바일 및 태블릿에서 확대/축소 방지, 전체화면 최적화 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>뱅가드 스마트 필드</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome (최소한의 기호 아이콘용) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* 드래그 및 텍스트 선택 방지, 순수 검은색 배경 */
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 검은색 원본 PNG를 파란색(뱅가드)으로 변환하는 CSS 필터 */
+        .circle-blue {
+            filter: brightness(0) saturate(100%) invert(42%) sepia(95%) saturate(2050%) hue-rotate(198deg) brightness(102%) contrast(102%);
+        }
+
+        /* 검은색 원본 PNG를 노란색(리어가드)으로 변환하는 CSS 필터 */
+        .circle-yellow {
+            filter: brightness(0) saturate(100%) invert(88%) sepia(82%) saturate(1800%) hue-rotate(356deg) brightness(104%) contrast(104%);
+        }
+
+        /* 선택된 서클(불투명도 100%)의 시인성을 위한 은은한 발광 효과 */
+        .selected-blue {
+            filter: brightness(0) saturate(100%) invert(42%) sepia(95%) saturate(2050%) hue-rotate(198deg) brightness(105%) contrast(102%) drop-shadow(0 0 14px rgba(59, 130, 246, 0.85));
+        }
+
+        .selected-yellow {
+            filter: brightness(0) saturate(100%) invert(88%) sepia(82%) saturate(1800%) hue-rotate(356deg) brightness(106%) contrast(104%) drop-shadow(0 0 14px rgba(250, 204, 21, 0.85));
+        }
+
+        /* 파워 텍스트 가독성 그림자 */
+        .power-text {
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 1);
+        }
+
+        /* 터치 피드백 */
+        .tap-scale:active {
+            transform: scale(0.92);
+        }
+    </style>
 </head>
-<body>
-<h1>hello world</h1>
+<body class="h-screen w-screen relative bg-black select-none" oncontextmenu="return false;" onclick="handleBackgroundClick(event)">
+
+    <!-- 메인 6서클 그리드 (박스 없는 순수 서클 레이아웃) -->
+    <div id="field-grid" class="w-full h-full grid grid-cols-3 grid-rows-2 place-items-center px-6 pt-2 pb-14">
+        <!-- JS에서 6개의 서클이 렌더링됩니다 -->
+    </div>
+
+    <!-- 우측 하단 미니멀 파워 조작 표시줄 (- 5k + ↻) -->
+    <div id="control-bar" onclick="event.stopPropagation()" 
+        class="fixed bottom-4 right-6 flex items-center space-x-6 px-6 py-2 border-2 border-white/80 text-white z-30 bg-black/90">
+        
+        <!-- 파워 감소 (-) -->
+        <button onclick="adjustSelectedPower(-1)" class="text-3xl font-light px-2 hover:text-red-400 tap-scale transition" title="파워 감소">
+            &minus;
+        </button>
+
+        <!-- 증감 단위 표시 및 전환 (클릭 시 5k -> 10k -> 1k -> 1억 순환) -->
+        <button id="step-btn" onclick="cycleStep()" class="text-2xl font-bold tracking-wider min-w-[3.5rem] text-center hover:text-yellow-300 tap-scale transition" title="클릭하여 증감 단위 변경">
+            5k
+        </button>
+
+        <!-- 파워 증가 (+) -->
+        <button onclick="adjustSelectedPower(1)" class="text-3xl font-light px-2 hover:text-green-400 tap-scale transition" title="파워 증가">
+            +
+        </button>
+
+        <!-- 구분 여백 및 보조 단위 빠른 전환 (10k / 1억) -->
+        <button onclick="quickAdd(10000)" class="text-lg font-medium text-white/70 hover:text-white tap-scale transition">
+            +10k
+        </button>
+
+        <!-- 턴 종료 / 원래 파워로 리셋 (↻) -->
+        <button onclick="resetTurn()" class="text-2xl pl-2 hover:text-blue-400 tap-scale transition" title="턴 종료 (변동 파워 초기화)">
+            <i class="fa-solid fa-rotate-right"></i>
+        </button>
+    </div>
+
+    <!-- 기본 파워 선택 오버레이 (박스 최소화, 깔끔한 텍스트 중심) -->
+    <div id="base-power-overlay" onclick="closeBasePowerSelector()" 
+        class="fixed inset-0 bg-black/85 hidden flex flex-col items-center justify-center z-50 backdrop-blur-sm">
+        <div onclick="event.stopPropagation()" class="flex flex-col items-center space-y-8">
+            <div class="text-sm tracking-widest text-white/50 uppercase">Base Power</div>
+            <div class="flex flex-wrap justify-center gap-x-10 gap-y-6 max-w-xl px-6">
+                <button onclick="selectBasePower(0)" class="text-3xl font-bold text-white/60 hover:text-white tap-scale transition">0</button>
+                <button onclick="selectBasePower(4000)" class="text-3xl font-bold text-white/80 hover:text-white tap-scale transition">4000</button>
+                <button onclick="selectBasePower(5000)" class="text-3xl font-bold text-white/80 hover:text-white tap-scale transition">5000</button>
+                <button onclick="selectBasePower(6000)" class="text-3xl font-bold text-white/80 hover:text-white tap-scale transition">6000</button>
+                <button onclick="selectBasePower(8000)" class="text-3xl font-bold text-white/80 hover:text-white tap-scale transition">8000</button>
+                <button onclick="selectBasePower(10000)" class="text-3xl font-bold text-white/90 hover:text-white tap-scale transition">10000</button>
+                <button onclick="selectBasePower(12000)" class="text-3xl font-bold text-white/90 hover:text-white tap-scale transition">12000</button>
+                <button onclick="selectBasePower(13000)" class="text-4xl font-extrabold text-blue-400 hover:text-blue-300 tap-scale transition">13000</button>
+                <button onclick="selectBasePower(15000)" class="text-3xl font-bold text-white/90 hover:text-white tap-scale transition">15000</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const VC_IMAGE = 'https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/TEST_CFV/Vcircle.png';
+        const RC_IMAGE = 'https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/TEST_CFV/Lcircle.png';
+
+        // 6개 서클 상태
+        // hasUnit: 최중심부를 눌러 유닛이 존재함을 표시 (true일 때 불투명도 90%, false일 때 40%)
+        // 선택된 서클(selectedZoneId === id)은 불투명도 100%
+        const zones = [
+            { id: 0, type: 'RC', hasUnit: false, base: 10000, mod: 0 },
+            { id: 1, type: 'VC', hasUnit: true,  base: 13000, mod: 0 },
+            { id: 2, type: 'RC', hasUnit: false, base: 10000, mod: 0 },
+            { id: 3, type: 'RC', hasUnit: false, base: 8000,  mod: 0 },
+            { id: 4, type: 'RC', hasUnit: false, base: 8000,  mod: 0 },
+            { id: 5, type: 'RC', hasUnit: false, base: 8000,  mod: 0 }
+        ];
+
+        // 현재 선택된 서클 ID (없으면 null)
+        let selectedZoneId = null;
+
+        // 기본 파워 변경 대상 서클 ID
+        let editingBaseZoneId = null;
+
+        // 우측 하단 조작바의 증감 단위 목록
+        const steps = [
+            { label: '5k', value: 5000 },
+            { label: '10k', value: 10000 },
+            { label: '1k', value: 1000 },
+            { label: '1억', value: 100000000 }
+        ];
+        let currentStepIndex = 0;
+
+        // 파워 숫자 포맷팅 (스케치처럼 13000 형태, 1억 이상은 축약)
+        function formatPower(power) {
+            if (power >= 100000000) {
+                const uk = Math.floor(power / 100000000);
+                const rest = power % 100000000;
+                return rest > 0 ? `${uk}억+${rest}` : `${uk}억`;
+            }
+            return String(power);
+        }
+
+        // 초기 그리드 생성
+        function renderField() {
+            const grid = document.getElementById('field-grid');
+            grid.innerHTML = '';
+
+            zones.forEach(zone => {
+                const isVC = zone.type === 'VC';
+                const imgSrc = isVC ? VC_IMAGE : RC_IMAGE;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'relative flex flex-col items-center justify-center w-full h-full';
+
+                wrapper.innerHTML = `
+                    <!-- 서클 전체 영역 (외곽 클릭 시 해당 서클 선택 -> 불투명도 100%) -->
+                    <div id="circle-outer-${zone.id}" 
+                         onclick="selectCircle(event, ${zone.id})"
+                         class="relative flex items-center justify-center w-[38vh] h-[38vh] max-w-[26vw] max-h-[26vw] cursor-pointer transition-opacity duration-200">
+                        
+                        <!-- 서클 이미지 -->
+                        <img id="circle-img-${zone.id}" 
+                             src="${imgSrc}" 
+                             alt="${zone.type}" 
+                             class="w-full h-full object-contain pointer-events-none transition-all duration-200" />
+
+                        <!-- 서클의 작은 최중심부 (클릭 시 유닛 유무 전환: 90% <-> 40%) -->
+                        <div id="circle-center-${zone.id}"
+                             onclick="toggleUnitPresence(event, ${zone.id})"
+                             class="absolute w-[34%] h-[34%] rounded-full z-10 flex items-center justify-center cursor-pointer"
+                             title="최중심부 터치: 유닛 유무 전환">
+                        </div>
+                    </div>
+
+                    <!-- 서클 하단 파워 숫자 (클릭 시 기본 파워 선택) -->
+                    <button id="power-label-${zone.id}"
+                            onclick="openBasePowerSelector(event, ${zone.id})"
+                            class=" -mt-5 z-20 text-4xl md:text-5xl font-bold tracking-tight power-text tap-scale transition cursor-pointer">
+                        13000
+                    </button>
+                `;
+
+                grid.appendChild(wrapper);
+            });
+
+            updateUI();
+        }
+
+        // UI 상태 반영 (불투명도 40% / 90% / 100% 및 파워 텍스트 업데이트)
+        function updateUI() {
+            zones.forEach(zone => {
+                const outerEl = document.getElementById(`circle-outer-${zone.id}`);
+                const imgEl = document.getElementById(`circle-img-${zone.id}`);
+                const powerEl = document.getElementById(`power-label-${zone.id}`);
+                if (!outerEl || !imgEl || !powerEl) return;
+
+                const isVC = zone.type === 'VC';
+                const isSelected = (selectedZoneId === zone.id);
+
+                // 불투명도 규칙 적용:
+                // 1) 현재 선택중인 서클: 불투명도 100% (1.0)
+                // 2) 유닛이 있는 서클(hasUnit): 불투명도 90% (0.9)
+                // 3) 유닛이 없는 서클(!hasUnit): 불투명도 40% (0.4)
+                if (isSelected) {
+                    outerEl.style.opacity = '1';
+                    imgEl.className = `w-full h-full object-contain pointer-events-none transition-all duration-200 ${isVC ? 'selected-blue' : 'selected-yellow'}`;
+                } else if (zone.hasUnit) {
+                    outerEl.style.opacity = '0.9';
+                    imgEl.className = `w-full h-full object-contain pointer-events-none transition-all duration-200 ${isVC ? 'circle-blue' : 'circle-yellow'}`;
+                } else {
+                    outerEl.style.opacity = '0.4';
+                    imgEl.className = `w-full h-full object-contain pointer-events-none transition-all duration-200 ${isVC ? 'circle-blue' : 'circle-yellow'}`;
+                }
+
+                // 파워 텍스트 표시 업데이트
+                const totalPower = zone.base + zone.mod;
+                powerEl.innerText = formatPower(totalPower);
+
+                // 유닛이 있거나 현재 선택된 경우 파워 숫자를 선명하게 표시, 유닛이 없으면 숨김
+                if (zone.hasUnit || isSelected) {
+                    powerEl.classList.remove('opacity-0', 'pointer-events-none');
+                    if (zone.mod > 0) {
+                        powerEl.className = '-mt-5 z-20 text-4xl md:text-5xl font-bold tracking-tight power-text tap-scale transition cursor-pointer text-green-300';
+                    } else if (zone.mod < 0) {
+                        powerEl.className = '-mt-5 z-20 text-4xl md:text-5xl font-bold tracking-tight power-text tap-scale transition cursor-pointer text-red-400';
+                    } else {
+                        powerEl.className = '-mt-5 z-20 text-4xl md:text-5xl font-bold tracking-tight power-text tap-scale transition cursor-pointer text-white';
+                    }
+                } else {
+                    powerEl.classList.add('opacity-0', 'pointer-events-none');
+                }
+            });
+        }
+
+        // 최중심부 클릭: 유닛 유무(90% <-> 40%) 전환
+        function toggleUnitPresence(event, id) {
+            event.stopPropagation();
+            const zone = zones[id];
+            zone.hasUnit = !zone.hasUnit;
+
+            // 유닛이 없어지면 해당 서클의 파워 변동치도 초기화하고 선택 해제
+            if (!zone.hasUnit) {
+                zone.mod = 0;
+                if (selectedZoneId === id) {
+                    selectedZoneId = null;
+                }
+            }
+            updateUI();
+        }
+
+        // 최중심부 외곽 클릭: 현재 조작할 서클로 선택 (불투명도 100%)
+        function selectCircle(event, id) {
+            event.stopPropagation();
+            if (selectedZoneId === id) {
+                // 이미 선택된 서클의 외곽을 다시 누르면 선택 해제 (원래 상태인 90% 또는 40%로 복귀)
+                selectedZoneId = null;
+            } else {
+                selectedZoneId = id;
+            }
+            updateUI();
+        }
+
+        // 빈 검은색 배경 클릭 시 선택 해제
+        function handleBackgroundClick() {
+            if (selectedZoneId !== null) {
+                selectedZoneId = null;
+                updateUI();
+            }
+        }
+
+        // 우측 하단 바: 증감 단위 전환 (5k -> 10k -> 1k -> 1억)
+        function cycleStep() {
+            currentStepIndex = (currentStepIndex + 1) % steps.length;
+            document.getElementById('step-btn').innerText = steps[currentStepIndex].label;
+        }
+
+        // 우측 하단 바: 현재 선택된 서클의 파워 증감 (- / +)
+        function adjustSelectedPower(direction) {
+            if (selectedZoneId === null) return;
+            const zone = zones[selectedZoneId];
+            // 파워를 조작하면 자동으로 유닛이 있는 상태로 처리
+            zone.hasUnit = true;
+            zone.mod += direction * steps[currentStepIndex].value;
+            updateUI();
+        }
+
+        // 우측 하단 바: 빠른 파워 추가 (+10k)
+        function quickAdd(amount) {
+            if (selectedZoneId === null) return;
+            const zone = zones[selectedZoneId];
+            zone.hasUnit = true;
+            zone.mod += amount;
+            updateUI();
+        }
+
+        // 우측 하단 바: 턴 종료 (모든 서클의 변동 파워를 원래 기본 파워로 복귀)
+        function resetTurn() {
+            zones.forEach(zone => {
+                zone.mod = 0;
+            });
+            selectedZoneId = null;
+            updateUI();
+        }
+
+        // 하단 파워 숫자 클릭: 기본 파워 선택 창 열기
+        function openBasePowerSelector(event, id) {
+            event.stopPropagation();
+            editingBaseZoneId = id;
+            selectedZoneId = id;
+            updateUI();
+            document.getElementById('base-power-overlay').classList.remove('hidden');
+        }
+
+        function closeBasePowerSelector() {
+            editingBaseZoneId = null;
+            document.getElementById('base-power-overlay').classList.add('hidden');
+        }
+
+        function selectBasePower(power) {
+            if (editingBaseZoneId !== null) {
+                zones[editingBaseZoneId].base = power;
+                zones[editingBaseZoneId].hasUnit = true;
+                updateUI();
+            }
+            closeBasePowerSelector();
+        }
+
+        // 화면이 꺼지지 않도록 자동 Wake Lock 시도
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    await navigator.wakeLock.request('screen');
+                }
+            } catch (e) {
+                // 지원하지 않는 환경에서는 무시
+            }
+        }
+
+        window.onload = () => {
+            renderField();
+            requestWakeLock();
+        };
+    </script>
 </body>
 </html>
