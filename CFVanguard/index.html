@@ -73,7 +73,7 @@
             &minus;
         </button>
 
-        <!-- 증감 단위 표시 및 전환 (클릭 시 5000 -> 10000 -> 1000 -> 100000000 순환) -->
+        <!-- 증감 단위 표시 및 전환 (클릭 시 5000 -> 10000 -> 100000000 순환) -->
         <button id="step-btn" onclick="cycleStep()" class="text-2xl font-bold tracking-wider min-w-[4.5rem] text-center hover:text-yellow-300 tap-scale transition" title="클릭하여 증감 단위 변경">
             5000
         </button>
@@ -84,13 +84,13 @@
         </button>
 
         <!-- 부스트 버튼 (현재 선택된 열의 후열 파워를 전열에 합산) -->
-        <button id="boost-btn" onclick="toggleBoost()" class="text-lg font-bold tracking-tight text-white/70 hover:text-white tap-scale transition" title="선택된 열 부스트 전환">
-            부스트
+        <button id="boost-btn" onclick="toggleBoost()" class="flex items-center justify-center opacity-40 hover:opacity-75 tap-scale transition" title="선택된 열 부스트 전환">
+            <img src="https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/TEST_CFV/boost.webp" alt="부스트" class="h-8 w-auto object-contain pointer-events-none" />
         </button>
 
         <!-- 페르소나 라이드 버튼 (전열 +10000 전환) -->
-        <button id="persona-btn" onclick="togglePersonaRide()" class="text-lg font-bold tracking-tight text-white/70 hover:text-white tap-scale transition" title="페르소나 라이드 (전열 +10000)">
-            페르소나 라이드
+        <button id="persona-btn" onclick="togglePersonaRide()" class="flex items-center justify-center opacity-40 hover:opacity-75 tap-scale transition" title="페르소나 라이드 (전열 +10000)">
+            <img src="https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/TEST_CFV/personaride.webp" alt="페르소나 라이드" class="h-8 w-auto object-contain pointer-events-none" />
         </button>
 
         <!-- 턴 종료 / 원래 파워로 리셋 (↻) -->
@@ -146,11 +146,10 @@
         // 각 세로열(0: 좌측, 1: 중앙, 2: 우측)의 부스트 활성화 여부
         let boostedColumns = [false, false, false];
 
-        // 우측 하단 조작바의 증감 단위 목록
+        // 우측 하단 조작바의 증감 단위 목록 (5000 -> 10000 -> 100000000)
         const steps = [
             { label: '5000', value: 5000 },
             { label: '10000', value: 10000 },
-            { label: '1000', value: 1000 },
             { label: '100000000', value: 100000000 }
         ];
         let currentStepIndex = 0;
@@ -273,22 +272,22 @@
                 }
             });
 
-            // 페르소나 라이드 버튼 활성화 표시 업데이트
+            // 페르소나 라이드 아이콘 버튼 활성화 표시 업데이트 (비활성: 반투명 / 활성: 불투명 + 발광)
             const personaBtn = document.getElementById('persona-btn');
             if (personaBtn) {
                 personaBtn.className = personaRideActive
-                    ? 'text-lg font-bold tracking-tight text-blue-400 tap-scale transition'
-                    : 'text-lg font-bold tracking-tight text-white/70 hover:text-white tap-scale transition';
+                    ? 'flex items-center justify-center opacity-100 drop-shadow-[0_0_8px_rgba(96,165,250,0.9)] tap-scale transition'
+                    : 'flex items-center justify-center opacity-40 hover:opacity-75 tap-scale transition';
             }
 
-            // 부스트 버튼 활성화 표시 업데이트 (현재 선택된 서클의 열 기준)
+            // 부스트 아이콘 버튼 활성화 표시 업데이트 (현재 선택된 서클의 열 기준)
             const boostBtn = document.getElementById('boost-btn');
             if (boostBtn) {
                 const col = selectedZoneId !== null ? (selectedZoneId % 3) : null;
                 const isColBoosted = col !== null && boostedColumns[col];
                 boostBtn.className = isColBoosted
-                    ? 'text-lg font-bold tracking-tight text-yellow-300 tap-scale transition'
-                    : 'text-lg font-bold tracking-tight text-white/70 hover:text-white tap-scale transition';
+                    ? 'flex items-center justify-center opacity-100 drop-shadow-[0_0_8px_rgba(250,204,21,0.9)] tap-scale transition'
+                    : 'flex items-center justify-center opacity-40 hover:opacity-75 tap-scale transition';
             }
         }
 
