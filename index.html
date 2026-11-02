@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NivelWorks | Draw & Craft</title>
+
+  <!-- PWA (설치 기능) -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#000000">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
   
   <!-- Tailwind CSS CDN (설치 없이 디자인 적용) -->
   <script src="https://cdn.tailwindcss.com"></script>
