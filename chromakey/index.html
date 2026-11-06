@@ -121,16 +121,27 @@
     <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
       <!-- 모달 헤더 -->
       <div class="flex items-center justify-between px-6 py-4 bg-gray-800/80 border-b border-gray-700">
-        <div>
+        <div class="flex-1 pr-4">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <span>카드 목록 설정</span>
             <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
               우선도 오름차순(좌→우) 정렬
             </span>
           </h2>
-          <p class="text-xs text-gray-400 mt-0.5">
-            Cloudflare R2 경로: <code class="text-emerald-400">https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/(숫자).webp</code>
-          </p>
+          <!-- R2 경로 실시간 설정 및 테스트 바 -->
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-400">R2 폴더 경로:</span>
+            <select id="select-r2-path-preset" class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-emerald-400 font-mono focus:outline-none focus:border-indigo-500">
+              <option value="auto">자동 탐색 (carddata 포함/제외 모두 시도)</option>
+              <option value="carddata/Test/card_image/">/carddata/Test/card_image/ (폴더명 포함)</option>
+              <option value="Test/card_image/">/Test/card_image/ (carddata가 버킷명일 때)</option>
+            </select>
+            <input type="text" id="input-custom-r2-base" value="https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/"
+              class="flex-1 min-w-[260px] px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 font-mono focus:outline-none focus:border-indigo-500" />
+            <span id="r2-connection-badge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+              이미지 확인 대기
+            </span>
+          </div>
         </div>
         <button id="btn-close-cards" class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -337,9 +348,11 @@
   =========================================== -->
   <script>
     /**
-     * Cloudflare R2 이미지 기본 경로
+     * Cloudflare R2 이미지 기본 도메인 및 경로 설정
      */
-    const R2_BASE_URL = "https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/";
+    const R2_ORIGIN = "https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev";
+    let r2PathMode = "auto"; // 'auto' | 'carddata/Test/card_image/' | 'Test/card_image/' | 'custom'
+    let customR2BaseUrl = "https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/";
 
     /**
      * 전역 환경 설정 상태
@@ -389,10 +402,36 @@
       return trimmed.toLowerCase().endsWith(".webp") ? trimmed : `${trimmed}.webp`;
     }
 
-    function getFullR2Url(dbImageRaw) {
+    /**
+     * 입력된 번호에 대해 시도할 후보 URL 목록 생성
+     * - R2에서 버킷 이름이 'carddata'인 경우 URL에 'carddata/'가 빠진 '/Test/card_image/'가 실제 주소가 됩니다.
+     * - 반대로 버킷 안에 'carddata' 폴더가 있는 경우 '/carddata/Test/card_image/'가 실제 주소가 됩니다.
+     * 두 경우를 모두 자동으로 찾도록 후보군을 생성합니다.
+     */
+    function getCandidateR2Urls(dbImageRaw) {
       const fileName = getCleanImageFileName(dbImageRaw);
-      if (!fileName) return "";
-      return `${R2_BASE_URL}${fileName}`;
+      if (!fileName) return [];
+
+      const customNormalized = customR2BaseUrl.endsWith("/") ? customR2BaseUrl : `${customR2BaseUrl}/`;
+
+      if (r2PathMode !== "auto") {
+        return [`${customNormalized}${fileName}`];
+      }
+
+      // 자동 탐색 모드: 사용자가 입력한 기본 주소 + carddata 제외 주소 + carddata 포함 주소
+      const urls = [
+        `${customNormalized}${fileName}`,
+        `${R2_ORIGIN}/Test/card_image/${fileName}`,
+        `${R2_ORIGIN}/carddata/Test/card_image/${fileName}`,
+        `${R2_ORIGIN}/test/card_image/${fileName}`,
+        `${R2_ORIGIN}/carddata/test/card_image/${fileName}`
+      ];
+      return [...new Set(urls)];
+    }
+
+    function getFullR2Url(dbImageRaw) {
+      const candidates = getCandidateR2Urls(dbImageRaw);
+      return candidates[0] || "";
     }
 
     /**
@@ -448,9 +487,10 @@
     }
 
     /**
-     * R2 이미지를 로드하되, 인코딩 시 캔버스 SecurityError(Tainted Canvas)가 발생하지 않도록
-     * crossOrigin="anonymous"로 로드하고, 만약 R2 버킷에 CORS 헤더가 없을 경우
-     * 글로벌 이미지 CORS 프록시(wsrv.nl)를 통해 안전하게 우회 로드합니다.
+     * R2 이미지를 로드하되:
+     * 1) 후보 경로(carddata 포함 / 제외)를 순차 시도하고,
+     * 2) 인코딩을 위한 CORS 로드(직접 -> 프록시)를 먼저 시도한 뒤,
+     * 3) 만약 R2 CORS 설정 전이라도 화면에서는 즉시 보이도록 일반 Image 객체로도 폴백 로드합니다.
      */
     function preloadCardImage(dbImageRaw) {
       const key = String(dbImageRaw || "").trim();
@@ -461,35 +501,85 @@
 
       const entry = {
         status: "loading",
-        source: createFallbackCardCanvas(key)
+        source: createFallbackCardCanvas(key),
+        resolvedUrl: "",
+        corsReady: false
       };
       imageCache.set(key, entry);
 
-      const directUrl = getFullR2Url(key);
-      const img = new Image();
-      img.crossOrigin = "anonymous";
+      const candidateUrls = getCandidateR2Urls(key);
 
-      img.onload = () => {
-        entry.status = "loaded";
-        entry.source = img;
-      };
+      // 단일 URL을 다양한 방식(직접 CORS -> 프록시 CORS -> 일반 로드)으로 시도하는 헬퍼
+      function tryLoadSingleUrl(targetUrl) {
+        return new Promise((resolve, reject) => {
+          // 1차: 직접 CORS 로드
+          const imgCors = new Image();
+          imgCors.crossOrigin = "anonymous";
+          imgCors.onload = () => resolve({ img: imgCors, url: targetUrl, corsReady: true });
+          imgCors.onerror = () => {
+            // 2차: 일반 이미지 로드 (R2에 파일이 실제로 존재하는지 확인 겸 화면 표시용)
+            const imgPlain = new Image();
+            imgPlain.onload = () => {
+              // 파일이 존재하는 것이 확인되었으므로 인코딩용 CORS 프록시도 병행 시도
+              const proxyImg = new Image();
+              proxyImg.crossOrigin = "anonymous";
+              proxyImg.onload = () => resolve({ img: proxyImg, url: targetUrl, corsReady: true });
+              proxyImg.onerror = () => resolve({ img: imgPlain, url: targetUrl, corsReady: false });
+              proxyImg.src = `https://wsrv.nl/?url=${encodeURIComponent(targetUrl)}`;
+            };
+            imgPlain.onerror = () => reject(new Error("Not found: " + targetUrl));
+            imgPlain.src = targetUrl;
+          };
+          imgCors.src = targetUrl;
+        });
+      }
 
-      img.onerror = () => {
-        // 직접 CORS 로드 실패 시, CORS 헤더를 자동 부여해주는 프록시로 2차 시도
-        const proxyImg = new Image();
-        proxyImg.crossOrigin = "anonymous";
-        proxyImg.onload = () => {
-          entry.status = "loaded";
-          entry.source = proxyImg;
-        };
-        proxyImg.onerror = () => {
-          entry.status = "error";
-        };
-        proxyImg.src = `https://wsrv.nl/?url=${encodeURIComponent(directUrl)}`;
-      };
+      (async () => {
+        for (const url of candidateUrls) {
+          try {
+            const res = await tryLoadSingleUrl(url);
+            entry.status = "loaded";
+            entry.source = res.img;
+            entry.resolvedUrl = res.url;
+            entry.corsReady = res.corsReady;
+            updateR2ConnectionBadge(true, res.url, res.corsReady, key);
+            // 모달이 열려 있다면 썸네일 갱신
+            refreshThumbnailsInModal(key, res.url);
+            return;
+          } catch (_) {
+            // 다음 후보 경로 시도
+          }
+        }
+        entry.status = "error";
+        updateR2ConnectionBadge(false, candidateUrls[0] || "", false, key);
+      })();
 
-      img.src = directUrl;
       return entry;
+    }
+
+    function updateR2ConnectionBadge(success, url, corsReady, key) {
+      const badge = document.getElementById("r2-connection-badge");
+      if (!badge) return;
+      if (success) {
+        const shortPath = url.replace(R2_ORIGIN, "");
+        if (corsReady) {
+          badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+          badge.textContent = `✓ 연결 성공 (${shortPath})`;
+        } else {
+          badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40";
+          badge.textContent = `✓ 이미지 확인됨 (${shortPath}) · 인코딩 시 R2 CORS 허용 권장`;
+        }
+      } else {
+        badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40";
+        badge.textContent = `✗ '${key}.webp' 파일을 찾을 수 없음 (번호 또는 경로 확인)`;
+      }
+    }
+
+    function refreshThumbnailsInModal(key, resolvedUrl) {
+      document.querySelectorAll(`.thumb-img[data-db-key="${CSS.escape(key)}"]`).forEach(imgEl => {
+        imgEl.style.display = "block";
+        imgEl.src = resolvedUrl;
+      });
     }
 
     function preloadAllConfiguredImages() {
@@ -1030,7 +1120,8 @@
       row.dataset.listType = listType;
 
       const isMinus = item.op === "-";
-      const thumbUrl = !isMinus && item.dbImage ? getFullR2Url(item.dbImage) : "";
+      const cached = !isMinus && item.dbImage ? imageCache.get(String(item.dbImage).trim()) : null;
+      const thumbUrl = cached && cached.resolvedUrl ? cached.resolvedUrl : (!isMinus && item.dbImage ? getFullR2Url(item.dbImage) : "");
 
       row.innerHTML = `
         <!-- 1. 애니메이션 순서 -->
@@ -1078,7 +1169,7 @@
                 <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">.webp</span>
               </div>
               <div class="w-7 h-9 rounded bg-gray-950 border border-gray-700 overflow-hidden flex-shrink-0 flex items-center justify-center" title="R2 이미지 미리보기">
-                <img src="${thumbUrl}" alt="thumb" class="w-full h-full object-cover" onerror="this.style.display='none'" />
+                <img src="${thumbUrl}" data-db-key="${escapeHtml(String(item.dbImage).trim())}" alt="thumb" class="thumb-img w-full h-full object-cover" onerror="this.style.display='none'" />
               </div>
             </div>
           `}
@@ -1117,11 +1208,15 @@
             found.uid = e.target.value;
           } else if (field === "dbImage") {
             found.dbImage = e.target.value;
-            preloadCardImage(found.dbImage);
-            const imgEl = row.querySelector("img");
+            const cleanKey = String(found.dbImage).trim();
+            const imgEl = row.querySelector("img.thumb-img");
             if (imgEl) {
+              imgEl.dataset.dbKey = cleanKey;
+            }
+            const entry = preloadCardImage(cleanKey);
+            if (imgEl && entry && entry.resolvedUrl) {
               imgEl.style.display = "block";
-              imgEl.src = getFullR2Url(found.dbImage);
+              imgEl.src = entry.resolvedUrl;
             }
           }
         });
@@ -1266,6 +1361,31 @@
       renderAllBars();
       modalCards.classList.remove("hidden");
       modalCards.classList.add("flex");
+    });
+
+    // R2 경로 프리셋 및 직접 입력 이벤트
+    const selectR2PathPreset = document.getElementById("select-r2-path-preset");
+    const inputCustomR2Base = document.getElementById("input-custom-r2-base");
+
+    selectR2PathPreset.addEventListener("change", (e) => {
+      const val = e.target.value;
+      if (val === "auto") {
+        r2PathMode = "auto";
+      } else {
+        r2PathMode = "custom";
+        customR2BaseUrl = `${R2_ORIGIN}/${val}`;
+        inputCustomR2Base.value = customR2BaseUrl;
+      }
+      imageCache.clear();
+      preloadAllConfiguredImages();
+      renderAllBars();
+    });
+
+    inputCustomR2Base.addEventListener("change", (e) => {
+      customR2BaseUrl = e.target.value.trim();
+      imageCache.clear();
+      preloadAllConfiguredImages();
+      renderAllBars();
     });
 
     function closeCardsModalAndApply() {
