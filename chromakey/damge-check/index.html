@@ -1,1 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCG 측면 등장/퇴장 크로마키 인코더</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans KR -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
+  <style>
+    body {
+      font-family: 'Noto Sans KR', 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      user-select: none;
+      background-color: #111827;
+    }
+
+    /* 커스텀 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1f2937;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+
+    /* 드래그 중인 바 스타일 */
+    .bar-dragging {
+      opacity: 0.95;
+      transform: scale(1.015);
+      box-shadow: 0 12px 25px -5px rgba(0, 0, 0, 0.6), 0 0 0 2px #3b82f6;
+      z-index: 50;
+      background-color: #1e293b !important;
+    }
+
+    .drag-handle {
+      touch-action: none;
+      cursor: grab;
+    }
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen flex items-center justify-center bg-gray-950">
+
+  <!-- ==========================================
+       메인 렌더링 캔버스 (인코딩 시 이 캔버스만 녹화됨)
+  =========================================== -->
+  <div id="canvas-container" class="relative w-full h-full flex items-center justify-center overflow-hidden">
+    <canvas id="stage-canvas" width="1920" height="1080" class="max-w-full max-h-full object-contain shadow-2xl"></canvas>
+  </div>
+
+  <!-- ==========================================
+       좌측 상단: 현재 상태 표시 배지 (영상에는 녹화되지 않음)
+  =========================================== -->
+  <div class="fixed top-4 left-4 z-20 flex flex-col gap-2 pointer-events-none">
+    <div id="status-badge" class="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-gray-900/85 backdrop-blur-md border border-gray-700/80 text-white text-sm shadow-lg">
+      <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+      <span id="status-text" class="font-medium">대기 중</span>
+    </div>
+    <div id="sub-status-badge" class="hidden items-center gap-2 px-3 py-1.5 rounded-lg bg-black/75 backdrop-blur text-xs text-gray-300 border border-gray-800">
+      <span id="sub-status-text"></span>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       우측 상단: 컨트롤 버튼 그룹 (인코딩 / 카드 목록 / 설정)
+  =========================================== -->
+  <div class="fixed top-4 right-4 z-20 flex flex-wrap items-center gap-2.5">
+    <!-- 테스트 재생 버튼 (인코딩 전 눈으로 확인용) -->
+    <button id="btn-preview" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800/90 hover:bg-gray-700 active:scale-95 text-gray-100 font-medium text-sm border border-gray-600/80 shadow-lg backdrop-blur-md transition">
+      <svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
+        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+      </svg>
+      <span>미리보기 재생</span>
+    </button>
+
+    <!-- 인코딩 버튼 -->
+    <button id="btn-encode" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-semibold text-sm border border-rose-400/40 shadow-lg shadow-rose-950/50 transition">
+      <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+      <span>인코딩</span>
+    </button>
+
+    <!-- 카드 목록(모달) 버튼 -->
+    <button id="btn-open-cards" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-sm border border-indigo-400/40 shadow-lg shadow-indigo-950/50 transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+      <span>카드 설정</span>
+    </button>
+
+    <!-- 설정(모달) 버튼 -->
+    <button id="btn-open-settings" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800/90 hover:bg-gray-700 active:scale-95 text-white font-semibold text-sm border border-gray-600/80 shadow-lg backdrop-blur-md transition">
+      <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+      <span>설정</span>
+    </button>
+  </div>
+
+  <!-- ==========================================
+       모달 1: 카드 목록 모달
+  =========================================== -->
+  <div id="modal-cards" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- 모달 헤더 -->
+      <div class="flex items-center justify-between px-6 py-4 bg-gray-800/80 border-b border-gray-700">
+        <div class="flex-1 pr-4">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>단일 카드 설정</span>
+            <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              측면 등장 및 퇴장 연출
+            </span>
+          </h2>
+          <!-- R2 경로 실시간 설정 및 테스트 바 -->
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-400">R2 URL:</span>
+            <div class="relative flex-1 min-w-[240px] flex items-center">
+              <input type="password" id="input-custom-r2-base" value="" placeholder="https://pub-xxxxxxxx.r2.dev (직접 입력)"
+                autocomplete="off" spellcheck="false"
+                class="w-full pl-2.5 pr-8 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 font-mono focus:outline-none focus:border-indigo-500" />
+              <button type="button" id="btn-toggle-r2-visibility" class="absolute right-2 text-gray-400 hover:text-gray-200 text-xs" title="URL 표시/숨기기">
+                👁️
+              </button>
+            </div>
+            <select id="select-r2-path-preset" class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-emerald-400 font-mono focus:outline-none focus:border-indigo-500">
+              <option value="auto">자동 경로 탐색 (/carddata 포함·제외 모두 시도)</option>
+              <option value="carddata/Test/card_image/">/carddata/Test/card_image/</option>
+              <option value="Test/card_image/">/Test/card_image/</option>
+              <option value="direct">직접 입력한 전체 경로 그대로 사용</option>
+            </select>
+            <span id="r2-connection-badge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-amber-400 border border-gray-700">
+              R2 URL을 입력해 주세요
+            </span>
+          </div>
+        </div>
+        <button id="btn-close-cards" class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- 모달 본문: 단일 카드 설정 -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-5 rounded bg-emerald-500"></span>
+              <h3 class="text-base font-bold text-white">등장할 단일 카드 (DB 이미지명)</h3>
+              <span class="text-xs text-gray-400">(애니메이션에 사용될 단일 카드 번호를 입력하세요)</span>
+            </div>
+          </div>
+          
+          <div class="bar-row flex items-center gap-4 px-5 py-4 rounded-xl bg-gray-800/90 border border-gray-700/80 transition">
+            <div class="text-sm font-bold text-gray-200 whitespace-nowrap">DB이미지명 (.webp)</div>
+            <div class="flex-1 flex items-center gap-3">
+              <div class="relative flex-1">
+                <input type="text" id="input-single-card" value="1" placeholder="숫자 (예: 101)"
+                  class="w-full pl-3 pr-12 py-2.5 rounded-xl bg-gray-900 border border-gray-700 text-white text-sm font-mono focus:outline-none focus:border-indigo-500 shadow-inner" />
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">.webp</span>
+              </div>
+              <div class="w-12 h-16 rounded-md bg-gray-950 border border-gray-700 overflow-hidden flex-shrink-0 flex items-center justify-center shadow-lg" title="R2 이미지 미리보기">
+                <img id="thumb-single-card" src="" data-db-key="1" alt="thumb" class="thumb-img w-full h-full object-cover" onerror="this.style.display='none'" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 모달 푸터 -->
+      <div class="px-6 py-4 bg-gray-800/80 border-t border-gray-700 flex justify-end">
+        <button id="btn-apply-cards" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg transition">
+          적용 및 닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       모달 2: 설정 모달
+  =========================================== -->
+  <div id="modal-settings" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden">
+      <!-- 헤더 -->
+      <div class="flex items-center justify-between px-6 py-4 bg-gray-800/80 border-b border-gray-700">
+        <h2 class="text-lg font-bold text-white">환경 및 애니메이션 설정</h2>
+        <button id="btn-close-settings" class="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- 본문 -->
+      <div class="p-6 space-y-6 overflow-y-auto max-h-[78vh]">
+        
+        <!-- 0. Cloudflare R2 보안 URL 입력 -->
+        <div class="space-y-2.5 p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80">
+          <div class="flex items-center justify-between">
+            <label class="block text-sm font-bold text-gray-200">
+              Cloudflare R2 Public URL (보안 직접 입력)
+            </label>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              HTML 코드 미포함
+            </span>
+          </div>
+          <p class="text-xs text-gray-400">
+            보안을 위해 코드 내에 URL을 저장하지 않습니다. 사용하실 R2 주소(예: <code class="text-gray-300">https://pub-xxxx.r2.dev</code>)를 직접 입력해 주세요.
+          </p>
+          <div class="flex items-center gap-2">
+            <input type="password" id="input-settings-r2-url" value="" placeholder="https://pub-xxxxxxxx.r2.dev"
+              autocomplete="off" spellcheck="false"
+              class="flex-1 px-3 py-2 rounded-xl bg-gray-900 border border-gray-600 text-white font-mono text-xs focus:outline-none focus:border-indigo-500" />
+            <button type="button" id="btn-settings-toggle-r2" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 text-xs font-medium transition">
+              표시
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-gray-800" />
+
+        <!-- 1. 크로마키 배경색 설정 (HEX) -->
+        <div class="space-y-2.5">
+          <label class="block text-sm font-bold text-gray-200">
+            배경색 설정 (크로마키 HEX)
+          </label>
+          <p class="text-xs text-gray-400">
+            카드 색상에 맞춰 크로마키 배경색을 세부 헥스(Hex) 코드로 지정할 수 있습니다. (기본값: 초록 <code class="text-emerald-400">#00FF00</code>)
+          </p>
+          <div class="flex items-center gap-3">
+            <input type="color" id="input-bg-picker" value="#00ff00" class="w-12 h-11 rounded-lg cursor-pointer bg-gray-800 border border-gray-600 p-1" />
+            <input type="text" id="input-bg-hex" value="#00FF00" maxlength="7" placeholder="#00FF00" class="flex-1 px-3.5 py-2.5 rounded-xl bg-gray-800 border border-gray-600 text-white font-mono text-sm focus:outline-none focus:border-indigo-500 uppercase" />
+          </div>
+          <!-- 프리셋 버튼 -->
+          <div class="flex flex-wrap gap-2 pt-1">
+            <button type="button" data-hex="#00FF00" class="hex-preset px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-[#00FF00]"></span>크로마 그린 (#00FF00)
+            </button>
+            <button type="button" data-hex="#00B140" class="hex-preset px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-[#00B140]"></span>스튜디오 그린 (#00B140)
+            </button>
+            <button type="button" data-hex="#0047BB" class="hex-preset px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-[#0047BB]"></span>크로마 블루 (#0047BB)
+            </button>
+            <button type="button" data-hex="#FF00FF" class="hex-preset px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-[#FF00FF]"></span>마젠타 (#FF00FF)
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-gray-800" />
+
+        <!-- 2. 카드가 추가되는 방향 및 상하 등장 위치 설정 -->
+        <div class="space-y-3.5">
+          <label class="block text-sm font-bold text-gray-200">
+            카드 추가 등장 방향 및 위치
+          </label>
+          <p class="text-xs text-gray-400">
+            카드가 추가될 때 어느 방향과 높이(위/아래)에서 등장하여 잠시 멈춘 뒤 손패로 들어갈지 설정합니다.
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <label id="label-dir-right" class="flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-sm">
+              <input type="radio" name="spawn-direction" value="right" checked class="hidden" />
+              <span>우측에서 등장 (기본)</span>
+              <span>⬅️</span>
+            </label>
+            <label id="label-dir-left" class="flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-gray-800 border-gray-700 text-gray-300 font-semibold text-sm">
+              <input type="radio" name="spawn-direction" value="left" class="hidden" />
+              <span>➡️</span>
+              <span>좌측에서 등장</span>
+            </label>
+          </div>
+
+          <!-- 카드 등장 상하(위/아래) 위치 조절 -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>카드 등장 상하 위치 (아래 ↔ 위)</span>
+              <span id="val-spawn-y" class="font-mono text-indigo-400">기본 위치 (0px)</span>
+            </div>
+            <input type="range" id="input-spawn-y" min="-400" max="400" step="5" value="0" class="w-full accent-indigo-500" />
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span>↓ 화면 아래로 (-400px)</span>
+              <span>중앙 기본 (0px)</span>
+              <span>↑ 화면 위로 (+400px)</span>
+            </div>
+            <!-- 빠른 등장 위치 프리셋 버튼 -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-sy="-250" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                하단 (-250)
+              </button>
+              <button type="button" data-sy="-120" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중하단 (-120)
+              </button>
+              <button type="button" data-sy="0" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중앙 기본 (0)
+              </button>
+              <button type="button" data-sy="140" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중상단 (+140)
+              </button>
+              <button type="button" data-sy="280" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                상단 (+280)
+              </button>
+            </div>
+          </div>
+
+          <!-- 카드 정지 좌우(좌/우) 위치 조절 -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5 mt-2">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>카드 정지 좌우 위치 (좌 ↔ 우)</span>
+              <span id="val-spawn-x" class="font-mono text-indigo-400">기본 위치 (0px)</span>
+            </div>
+            <input type="range" id="input-spawn-x" min="-800" max="800" step="5" value="0" class="w-full accent-indigo-500" />
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span>← 좌측으로 (-800px)</span>
+              <span>기본 (0px)</span>
+              <span>우측으로 (+800px) →</span>
+            </div>
+            <!-- 빠른 등장 위치 프리셋 버튼 -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-sx="-300" class="spawn-x-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                좌측 이동 (-300)
+              </button>
+              <button type="button" data-sx="0" class="spawn-x-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                기본 (0)
+              </button>
+              <button type="button" data-sx="300" class="spawn-x-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                우측 이동 (+300)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <hr class="border-gray-800" />
+
+        <!-- 3. 애니메이션 속도 및 타이밍 세부 설정 -->
+        <div class="space-y-4">
+          <label class="block text-sm font-bold text-gray-200">
+            애니메이션 이동 및 타이밍 세부 조정
+          </label>
+
+          <div>
+            <div class="flex justify-between text-xs text-gray-300 mb-1">
+              <span>카드 등장/퇴장 이동 시간 (초)</span>
+              <span id="val-move-sec" class="font-mono text-indigo-400">0.60초</span>
+            </div>
+            <input type="range" id="input-move-sec" min="0.2" max="2.0" step="0.05" value="0.6" class="w-full accent-indigo-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-gray-300 mb-1">
+              <span>화면에 멈춰있는 대기 시간 (초)</span>
+              <span id="val-pause-sec" class="font-mono text-indigo-400">1.50초</span>
+            </div>
+            <input type="range" id="input-pause-sec" min="0.5" max="5.0" step="0.1" value="1.5" class="w-full accent-indigo-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs text-gray-300 mb-1">
+              <span>카드 크기 배율</span>
+              <span id="val-card-scale" class="font-mono text-indigo-400">1.00x</span>
+            </div>
+            <input type="range" id="input-card-scale" min="0.6" max="1.5" step="0.05" value="1.0" class="w-full accent-indigo-500" />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 푸터 -->
+      <div class="px-6 py-4 bg-gray-800/80 border-t border-gray-700 flex justify-end">
+        <button id="btn-save-settings" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg transition">
+          확인
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       애플리케이션 로직 스크립트
+  =========================================== -->
+  <script>
+    /**
+     * Cloudflare R2 이미지 주소 상태 (보안을 위해 코드 내에 URL을 하드코딩하지 않음)
+     * 사용자가 UI에서 직접 입력한 URL만 런타임 메모리에 유지합니다.
+     */
+    let r2PathMode = "auto"; // 'auto' | 'carddata/Test/card_image/' | 'Test/card_image/' | 'direct'
+    let customR2BaseUrl = "";
+
+    /**
+     * 전역 환경 설정 상태 (단일 카드 등장 연출용)
+     */
+    const appSettings = {
+      bgColor: "#00FF00",          // 기본값: 크로마키 초록
+      spawnDirection: "right",     // 'right' | 'left'
+      spawnXOffset: 0,             // 카드 정지 좌우 위치 오프셋 (+: 우측, -: 좌측)
+      spawnYOffset: 0,             // 카드 등장 상하 위치 오프셋 (+: 위로 이동, -: 아래로 이동)
+      pauseDurationMs: 1500,       // 등장 후 멈춰있는 시간 (ms)
+      moveDurationMs: 600,         // 이동(등장/퇴장) 시간 (ms)
+      cardScale: 1.0               // 카드 렌더링 크기 배율
+    };
+
+    /**
+     * 단일 카드 설정 데이터
+     */
+    let singleCardConfig = { dbImage: "1" };
+
+    /**
+     * 이미지 캐시 (CORS 클린 캔버스 유지를 위한 스마트 로더)
+     * key: dbImage 문자열 -> { status: 'loading'|'loaded'|'error', img: HTMLImageElement | HTMLCanvasElement }
+     */
+    const imageCache = new Map();
+
+    function getCleanImageFileName(dbImageRaw) {
+      const trimmed = String(dbImageRaw || "").trim();
+      if (!trimmed) return "";
+      return trimmed.toLowerCase().endsWith(".webp") ? trimmed : `${trimmed}.webp`;
+    }
+
+    /**
+     * 사용자가 입력한 R2 주소에서 도메인(Origin) 추출 헬퍼
+     */
+    function extractOriginFromInput(rawUrl) {
+      const trimmed = String(rawUrl || "").trim().replace(/\/+$/, "");
+      if (!trimmed) return "";
+      try {
+        const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+        return parsed.origin;
+      } catch (_) {
+        return "";
+      }
+    }
+
+    /**
+     * 사용자가 직접 입력한 R2 URL과 번호를 조합하여 후보 URL 목록 생성
+     */
+    function getCandidateR2Urls(dbImageRaw) {
+      const fileName = getCleanImageFileName(dbImageRaw);
+      const rawInput = String(customR2BaseUrl || "").trim();
+      if (!fileName || !rawInput) return [];
+
+      const normalizedInput = (rawInput.startsWith("http") ? rawInput : `https://${rawInput}`).replace(/\/+$/, "");
+      const origin = extractOriginFromInput(normalizedInput);
+
+      if (r2PathMode === "direct" || !origin) {
+        return [`${normalizedInput}/${fileName}`];
+      }
+
+      if (r2PathMode === "carddata/Test/card_image/" || r2PathMode === "Test/card_image/") {
+        return [`${origin}/${r2PathMode}${fileName}`];
+      }
+
+      // 자동 탐색 모드: 사용자가 전체 경로를 넣었든 도메인만 넣었든 모두 탐색
+      const urls = [
+        `${normalizedInput}/${fileName}`,
+        `${origin}/Test/card_image/${fileName}`,
+        `${origin}/carddata/Test/card_image/${fileName}`,
+        `${origin}/test/card_image/${fileName}`,
+        `${origin}/carddata/test/card_image/${fileName}`
+      ];
+      return [...new Set(urls)];
+    }
+
+    function getFullR2Url(dbImageRaw) {
+      const candidates = getCandidateR2Urls(dbImageRaw);
+      return candidates[0] || "";
+    }
+
+    /**
+     * 이미지 로드 실패 또는 미존재 번호일 때 사용할 깔끔한 대체 카드 캔버스 생성
+     */
+    function createFallbackCardCanvas(dbImageRaw) {
+      const off = document.createElement("canvas");
+      off.width = 300;
+      off.height = 420;
+      const c = off.getContext("2d");
+
+      // 카드 배경 그라데이션
+      const grad = c.createLinearGradient(0, 0, 300, 420);
+      grad.addColorStop(0, "#1e293b");
+      grad.addColorStop(1, "#0f172a");
+      c.fillStyle = grad;
+      roundRectPath(c, 0, 0, 300, 420, 18);
+      c.fill();
+
+      // 외곽 프레임
+      c.lineWidth = 8;
+      c.strokeStyle = "#6366f1";
+      c.stroke();
+
+      // 내부 일러스트 박스
+      c.fillStyle = "#334155";
+      roundRectPath(c, 22, 55, 256, 230, 10);
+      c.fill();
+
+      // 텍스트 안내
+      c.fillStyle = "#e2e8f0";
+      c.font = "bold 28px 'Noto Sans KR', sans-serif";
+      c.textAlign = "center";
+      c.fillText(`DB: ${dbImageRaw || "?"}`, 150, 165);
+
+      c.fillStyle = "#94a3b8";
+      c.font = "15px 'Noto Sans KR', sans-serif";
+      c.fillText(`${getCleanImageFileName(dbImageRaw)}`, 150, 200);
+
+      // 하단 설명 박스
+      c.fillStyle = "#1e293b";
+      roundRectPath(c, 22, 300, 256, 95, 10);
+      c.fill();
+      c.lineWidth = 2;
+      c.strokeStyle = "#475569";
+      c.stroke();
+
+      c.fillStyle = "#cbd5e1";
+      c.font = "bold 18px 'Noto Sans KR', sans-serif";
+      c.fillText("TCG CARD", 150, 355);
+
+      return off;
+    }
+
+    /**
+     * R2 이미지를 로드하되:
+     * 1) 후보 경로(carddata 포함 / 제외)를 순차 시도하고,
+     * 2) 인코딩을 위한 CORS 로드(직접 -> 프록시)를 먼저 시도한 뒤,
+     * 3) 만약 R2 CORS 설정 전이라도 화면에서는 즉시 보이도록 일반 Image 객체로도 폴백 로드합니다.
+     */
+    function preloadCardImage(dbImageRaw) {
+      const key = String(dbImageRaw || "").trim();
+      if (!key) return null;
+      if (imageCache.has(key)) {
+        return imageCache.get(key);
+      }
+
+      const entry = {
+        status: "loading",
+        source: createFallbackCardCanvas(key),
+        resolvedUrl: "",
+        corsReady: false
+      };
+      imageCache.set(key, entry);
+
+      const candidateUrls = getCandidateR2Urls(key);
+      if (candidateUrls.length === 0) {
+        entry.status = "no_url";
+        updateR2ConnectionBadge(false, "", false, key, true);
+        return entry;
+      }
+
+      // 단일 URL을 다양한 방식(직접 CORS -> 프록시 CORS -> 일반 로드)으로 시도하는 헬퍼
+      function tryLoadSingleUrl(targetUrl) {
+        return new Promise((resolve, reject) => {
+          // 1차: 직접 CORS 로드
+          const imgCors = new Image();
+          imgCors.crossOrigin = "anonymous";
+          imgCors.onload = () => resolve({ img: imgCors, url: targetUrl, corsReady: true });
+          imgCors.onerror = () => {
+            // 2차: 일반 이미지 로드 (R2에 파일이 실제로 존재하는지 확인 겸 화면 표시용)
+            const imgPlain = new Image();
+            imgPlain.onload = () => {
+              // 파일이 존재하는 것이 확인되었으므로 인코딩용 CORS 프록시도 병행 시도
+              const proxyImg = new Image();
+              proxyImg.crossOrigin = "anonymous";
+              proxyImg.onload = () => resolve({ img: proxyImg, url: targetUrl, corsReady: true });
+              proxyImg.onerror = () => resolve({ img: imgPlain, url: targetUrl, corsReady: false });
+              proxyImg.src = `https://wsrv.nl/?url=${encodeURIComponent(targetUrl)}`;
+            };
+            imgPlain.onerror = () => reject(new Error("Not found: " + targetUrl));
+            imgPlain.src = targetUrl;
+          };
+          imgCors.src = targetUrl;
+        });
+      }
+
+      (async () => {
+        for (const url of candidateUrls) {
+          try {
+            const res = await tryLoadSingleUrl(url);
+            entry.status = "loaded";
+            entry.source = res.img;
+            entry.resolvedUrl = res.url;
+            entry.corsReady = res.corsReady;
+            updateR2ConnectionBadge(true, res.url, res.corsReady, key, false);
+            // 모달이 열려 있다면 썸네일 갱신
+            refreshThumbnailsInModal(key, res.url);
+            return;
+          } catch (_) {
+            // 다음 후보 경로 시도
+          }
+        }
+        entry.status = "error";
+        updateR2ConnectionBadge(false, candidateUrls[0] || "", false, key, false);
+      })();
+
+      return entry;
+    }
+
+    function updateR2ConnectionBadge(success, url, corsReady, key, isMissingUrl = false) {
+      const badge = document.getElementById("r2-connection-badge");
+      if (!badge) return;
+      if (isMissingUrl) {
+        badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40";
+        badge.textContent = "R2 URL을 입력해 주세요";
+        return;
+      }
+      const origin = extractOriginFromInput(url);
+      const shortPath = origin ? url.replace(origin, "") : url;
+      if (success) {
+        if (corsReady) {
+          badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+          badge.textContent = `✓ 연결 성공 (${shortPath})`;
+        } else {
+          badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40";
+          badge.textContent = `✓ 이미지 확인됨 (${shortPath}) · 인코딩 시 R2 CORS 허용 권장`;
+        }
+      } else {
+        badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40";
+        badge.textContent = `✗ '${key}.webp' 파일을 찾을 수 없음 (URL 또는 번호 확인)`;
+      }
+    }
+
+    function refreshThumbnailsInModal(key, resolvedUrl) {
+      const imgEl = document.getElementById("thumb-single-card");
+      if (imgEl && imgEl.dataset.dbKey === key) {
+        imgEl.style.display = "block";
+        imgEl.src = resolvedUrl;
+      }
+    }
+
+    function preloadAllConfiguredImages() {
+      if (singleCardConfig.dbImage) {
+        preloadCardImage(singleCardConfig.dbImage);
+      }
+    }
+
+    /**
+     * ==========================================
+     * 애니메이션 엔진 (Canvas 1920x1080)
+     * ==========================================
+     */
+    const canvas = document.getElementById("stage-canvas");
+    const ctx = canvas.getContext("2d");
+
+    const STAGE_W = 1920;
+    const STAGE_H = 1080;
+    const BASE_CARD_W = 250;
+    const BASE_CARD_H = 350;
+
+    // 현재 화면에 렌더링될 단일 카드 객체
+    let activeCard = null;
+
+    // 재생/인코딩 제어용 상태
+    let isPlayingSequence = false;
+    let isEncoding = false;
+    let sequenceAbortController = null;
+
+    /**
+     * 대기 상태 초기화
+     */
+    function resetToIdleState() {
+      preloadAllConfiguredImages();
+      activeCard = null;
+    }
+
+    /**
+     * 이징 함수 (더 부드러운 모션으로 변경)
+     */
+    function easeOutQuint(t) {
+      return 1 - Math.pow(1 - t, 5); // 등장 시 매우 부드럽게 감속
+    }
+    function easeInOutQuart(t) {
+      return t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2; // 퇴장 시 서서히 출발
+    }
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    /**
+     * 둥근 사각형 패스 헬퍼
+     */
+    function roundRectPath(context, x, y, w, h, r) {
+      context.beginPath();
+      context.moveTo(x + r, y);
+      context.lineTo(x + w - r, y);
+      context.quadraticCurveTo(x + w, y, x + w, y + r);
+      context.lineTo(x + w, y + h - r);
+      context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      context.lineTo(x + r, y + h);
+      context.quadraticCurveTo(x, y + h, x, y + h - r);
+      context.lineTo(x, y + r);
+      context.quadraticCurveTo(x, y, x + r, y);
+      context.closePath();
+    }
+
+    /**
+     * 단일 카드 렌더링
+     */
+    function drawCardObject(card, now) {
+      // 트윈 애니메이션 업데이트
+      if (card.anim) {
+        const elapsed = now - card.anim.startTime;
+        const progress = Math.min(1, Math.max(0, elapsed / card.anim.duration));
+        const eased = card.anim.easing ? card.anim.easing(progress) : easeInOutCubic(progress);
+
+        card.x = card.anim.startX + (card.anim.targetX - card.anim.startX) * eased;
+        card.y = card.anim.startY + (card.anim.targetY - card.anim.startY) * eased;
+        card.rot = card.anim.startRot + (card.anim.targetRot - card.anim.startRot) * eased;
+        card.scale = card.anim.startScale + (card.anim.targetScale - card.anim.startScale) * eased;
+        card.alpha = card.anim.startAlpha + (card.anim.targetAlpha - card.anim.startAlpha) * eased;
+
+        if (progress >= 1) {
+          card.anim = null;
+        }
+      }
+
+      const w = BASE_CARD_W * card.scale;
+      const h = BASE_CARD_H * card.scale;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, card.alpha));
+      ctx.translate(card.x, card.y);
+      ctx.rotate(card.rot);
+
+      // 카드 그림자 (손패 입체감)
+      ctx.save();
+      ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 10;
+      roundRectPath(ctx, -w / 2, -h / 2, w, h, 16 * card.scale);
+      ctx.fillStyle = "#0f172a";
+      ctx.fill();
+      ctx.restore();
+
+      // 클리핑 후 카드 이미지 그리기
+      ctx.save();
+      roundRectPath(ctx, -w / 2, -h / 2, w, h, 16 * card.scale);
+      ctx.clip();
+
+      const imgEntry = preloadCardImage(card.dbImage);
+      const drawable = imgEntry ? imgEntry.source : null;
+      if (drawable) {
+        ctx.drawImage(drawable, -w / 2, -h / 2, w, h);
+      }
+      ctx.restore();
+
+      // 카드 테두리 마감선
+      ctx.lineWidth = 2.5 * card.scale;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
+      roundRectPath(ctx, -w / 2, -h / 2, w, h, 16 * card.scale);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    /**
+     * 메인 렌더링 루프
+     */
+    function renderLoop(now) {
+      // 1. 크로마키 배경색 전체 칠하기
+      ctx.fillStyle = appSettings.bgColor;
+      ctx.fillRect(0, 0, STAGE_W, STAGE_H);
+
+      // 2. 카드 렌더링
+      if (activeCard) {
+        drawCardObject(activeCard, now);
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    /**
+     * 지정 시간(ms) 대기 Promise (취소 지원)
+     */
+    function sleep(ms, signal) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, ms);
+        if (signal) {
+          signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(new Error("Aborted"));
+          }, { once: true });
+        }
+      });
+    }
+
+    /**
+     * 단일 카드 등장 -> 대기 -> 퇴장 시퀀스 실행
+     */
+    async function runFullAnimationSequence(forEncoding = false) {
+      if (isPlayingSequence) {
+        if (sequenceAbortController) sequenceAbortController.abort();
+      }
+
+      sequenceAbortController = new AbortController();
+      const signal = sequenceAbortController.signal;
+      isPlayingSequence = true;
+
+      try {
+        resetToIdleState();
+        updateMainStatus(
+          forEncoding ? "영상 인코딩 녹화 중..." : "미리보기 애니메이션 재생 중...",
+          forEncoding ? "bg-rose-500 animate-ping" : "bg-amber-400 animate-pulse"
+        );
+
+        // 시작 홀드 (0.5초)
+        await sleep(500, signal);
+
+        const dbImage = String(singleCardConfig.dbImage).trim();
+        setSubStatus(`카드 등장 (${dbImage}.webp)`);
+
+        const isRight = appSettings.spawnDirection === "right";
+        const margin = BASE_CARD_W * appSettings.cardScale * 1.5;
+        const offScreenX = isRight ? STAGE_W + margin : -margin;
+        const baseOnScreenX = isRight ? STAGE_W - 350 : 350;
+        const onScreenX = baseOnScreenX + appSettings.spawnXOffset;
+        const yPos = (STAGE_H / 2) - appSettings.spawnYOffset;
+        const rot = isRight ? -0.06 : 0.06; // 살짝 기울임
+
+        // 1단계: 등장 (Move In)
+        activeCard = {
+          dbImage,
+          x: offScreenX,
+          y: yPos,
+          rot: rot * 2.5, // 밖에서는 조금 더 기울어진 상태
+          scale: appSettings.cardScale,
+          alpha: 1,
+          anim: {
+            startX: offScreenX,
+            startY: yPos,
+            startRot: rot * 2.5,
+            startScale: appSettings.cardScale,
+            startAlpha: 1,
+            targetX: onScreenX,
+            targetY: yPos,
+            targetRot: 0, // 정지 시 완벽한 수평(0도) 유지
+            targetScale: appSettings.cardScale,
+            targetAlpha: 1,
+            startTime: performance.now(),
+            duration: appSettings.moveDurationMs,
+            easing: easeOutQuint // 부드러운 감속 곡선 적용
+          }
+        };
+
+        await sleep(appSettings.moveDurationMs, signal);
+
+        // 2단계: 화면 중앙 측면에 잠시 멈춤
+        setSubStatus(`대기 중 (${(appSettings.pauseDurationMs/1000).toFixed(1)}초)`);
+        await sleep(appSettings.pauseDurationMs, signal);
+
+        // 3단계: 다시 나왔던 곳으로 퇴장 (Move Out)
+        setSubStatus("카드 퇴장");
+        activeCard.anim = {
+          startX: activeCard.x,
+          startY: activeCard.y,
+          startRot: activeCard.rot, // 수평 상태(0)에서 시작
+          startScale: activeCard.scale,
+          startAlpha: 1,
+          targetX: offScreenX, // 제자리(바깥)로
+          targetY: yPos,
+          targetRot: rot * 2.5, // 퇴장하며 다시 자연스럽게 기울어짐
+          targetScale: activeCard.scale,
+          targetAlpha: 1,
+          startTime: performance.now(),
+          duration: appSettings.moveDurationMs,
+          easing: easeInOutQuart // 서서히 출발하여 부드럽게 가속하는 곡선 적용
+        };
+
+        await sleep(appSettings.moveDurationMs + 200, signal);
+        
+        activeCard = null;
+
+        // 종료 전 여유 홀드 (0.5초)
+        setSubStatus("모든 연출 완료 (마무리 프레임 유지 중)");
+        await sleep(500, signal);
+
+        updateMainStatus("대기 중", "bg-emerald-400");
+        setSubStatus("");
+      } catch (err) {
+        if (err.message !== "Aborted") {
+          console.error(err);
+        }
+      } finally {
+        isPlayingSequence = false;
+      }
+    }
+
+    /**
+     * ==========================================
+     * 브라우저 직접 영상 인코딩 (Canvas CaptureStream + MediaRecorder)
+     * ==========================================
+     */
+    async function startVideoEncoding() {
+      if (isEncoding) return;
+      isEncoding = true;
+
+      const btnEncode = document.getElementById("btn-encode");
+      const originalBtnHtml = btnEncode.innerHTML;
+      btnEncode.disabled = true;
+      btnEncode.classList.add("opacity-70", "cursor-not-allowed");
+      btnEncode.innerHTML = `
+        <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>인코딩 중...</span>
+      `;
+
+      try {
+        // 모든 이미지가 로드될 때까지 잠깐 대기 (최대 2.5초)
+        preloadAllConfiguredImages();
+        await new Promise(r => setTimeout(r, 300));
+
+        // 60 FPS 스트림 캡처
+        const stream = canvas.captureStream(60);
+
+        // 지원되는 고화질 코덱 우선 선택
+        const mimeCandidates = [
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm",
+          "video/mp4"
+        ];
+        let selectedMime = "";
+        for (const mime of mimeCandidates) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(mime)) {
+            selectedMime = mime;
+            break;
+          }
+        }
+
+        const chunks = [];
+        const recorder = new MediaRecorder(stream, {
+          mimeType: selectedMime || undefined,
+          videoBitsPerSecond: 16_000_000 // 16 Mbps 고비트레이트 (크로마키 경계선 선명도 유지)
+        });
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            chunks.push(e.data);
+          }
+        };
+
+        const stopPromise = new Promise((resolve) => {
+          recorder.onstop = resolve;
+        });
+
+        // 녹화 시작 후 시퀀스 재생
+        recorder.start(100);
+        await runFullAnimationSequence(true);
+        recorder.stop();
+        await stopPromise;
+
+        // 파일 다운로드 처리
+        const ext = selectedMime.includes("mp4") ? "mp4" : "webm";
+        const blob = new Blob(chunks, { type: selectedMime || "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        a.href = url;
+        a.download = `tcg_hand_chromakey_${timestamp}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+        updateMainStatus(`인코딩 완료! 파일이 다운로드되었습니다 (.${ext})`, "bg-emerald-400");
+      } catch (err) {
+        console.error("Encoding error:", err);
+        updateMainStatus("인코딩 중 오류가 발생했습니다.", "bg-red-500");
+      } finally {
+        isEncoding = false;
+        btnEncode.disabled = false;
+        btnEncode.classList.remove("opacity-70", "cursor-not-allowed");
+        btnEncode.innerHTML = originalBtnHtml;
+      }
+    }
+
+    /**
+     * 상태 표시줄 업데이트 헬퍼
+     */
+    function updateMainStatus(text, dotClass = "bg-emerald-400") {
+      const dot = document.getElementById("status-dot");
+      const label = document.getElementById("status-text");
+      dot.className = `w-2.5 h-2.5 rounded-full ${dotClass}`;
+      label.textContent = text;
+    }
+
+    function setSubStatus(text) {
+      const box = document.getElementById("sub-status-badge");
+      const label = document.getElementById("sub-status-text");
+      if (!text) {
+        box.classList.add("hidden");
+        box.classList.remove("inline-flex");
+      } else {
+        box.classList.remove("hidden");
+        box.classList.add("inline-flex");
+        label.textContent = text;
+      }
+    }
+
+    /**
+     * ==========================================
+     * 단일 카드 설정 UI 및 모달 이벤트 바인딩
+     * ==========================================
+     */
+    const modalCards = document.getElementById("modal-cards");
+    const modalSettings = document.getElementById("modal-settings");
+    const inputSingleCard = document.getElementById("input-single-card");
+    const thumbSingleCard = document.getElementById("thumb-single-card");
+
+    // 단일 카드 입력 이벤트
+    if (inputSingleCard) {
+      inputSingleCard.addEventListener("input", (e) => {
+        const val = e.target.value.trim();
+        singleCardConfig.dbImage = val;
+        thumbSingleCard.dataset.dbKey = val;
+        const entry = preloadCardImage(val);
+        if (entry && entry.resolvedUrl) {
+          thumbSingleCard.style.display = "block";
+          thumbSingleCard.src = entry.resolvedUrl;
+        } else {
+          thumbSingleCard.style.display = "none";
+        }
+      });
+    }
+
+    // 카드 목록 모달 열기
+    document.getElementById("btn-open-cards").addEventListener("click", () => {
+      modalCards.classList.remove("hidden");
+      modalCards.classList.add("flex");
+    });
+
+    // R2 경로 프리셋 및 직접 입력 이벤트 (양방향 동기화)
+    const selectR2PathPreset = document.getElementById("select-r2-path-preset");
+    const inputCustomR2Base = document.getElementById("input-custom-r2-base");
+    const inputSettingsR2Url = document.getElementById("input-settings-r2-url");
+    const btnToggleR2Visibility = document.getElementById("btn-toggle-r2-visibility");
+    const btnSettingsToggleR2 = document.getElementById("btn-settings-toggle-r2");
+
+    function applyNewR2Url(newUrl) {
+      customR2BaseUrl = String(newUrl || "").trim();
+      inputCustomR2Base.value = customR2BaseUrl;
+      inputSettingsR2Url.value = customR2BaseUrl;
+      imageCache.clear();
+      preloadAllConfiguredImages();
+      
+      const val = singleCardConfig.dbImage;
+      if (val) {
+        const entry = preloadCardImage(val);
+        if (entry && entry.resolvedUrl) {
+          thumbSingleCard.style.display = "block";
+          thumbSingleCard.src = entry.resolvedUrl;
+        }
+      }
+    }
+
+    selectR2PathPreset.addEventListener("change", (e) => {
+      r2PathMode = e.target.value;
+      applyNewR2Url(customR2BaseUrl);
+    });
+
+    inputCustomR2Base.addEventListener("input", (e) => {
+      applyNewR2Url(e.target.value);
+    });
+
+    inputSettingsR2Url.addEventListener("input", (e) => {
+      applyNewR2Url(e.target.value);
+    });
+
+    // URL 마스킹(비밀번호 형태) 토글 버튼
+    btnToggleR2Visibility.addEventListener("click", () => {
+      const isHidden = inputCustomR2Base.type === "password";
+      inputCustomR2Base.type = isHidden ? "text" : "password";
+    });
+
+    btnSettingsToggleR2.addEventListener("click", () => {
+      const isHidden = inputSettingsR2Url.type === "password";
+      inputSettingsR2Url.type = isHidden ? "text" : "password";
+      btnSettingsToggleR2.textContent = isHidden ? "숨김" : "표시";
+    });
+
+    function closeCardsModalAndApply() {
+      modalCards.classList.add("hidden");
+      modalCards.classList.remove("flex");
+      resetToIdleState();
+      updateMainStatus("카드 설정이 반영되었습니다", "bg-emerald-400");
+    }
+
+    document.getElementById("btn-close-cards").addEventListener("click", closeCardsModalAndApply);
+    document.getElementById("btn-apply-cards").addEventListener("click", closeCardsModalAndApply);
+
+    // 설정 모달 열기/닫기
+    document.getElementById("btn-open-settings").addEventListener("click", () => {
+      modalSettings.classList.remove("hidden");
+      modalSettings.classList.add("flex");
+    });
+
+    function closeSettingsModal() {
+      modalSettings.classList.add("hidden");
+      modalSettings.classList.remove("flex");
+    }
+
+    document.getElementById("btn-close-settings").addEventListener("click", closeSettingsModal);
+    document.getElementById("btn-save-settings").addEventListener("click", closeSettingsModal);
+
+    // 배경색(HEX) 동기화
+    const inputBgPicker = document.getElementById("input-bg-picker");
+    const inputBgHex = document.getElementById("input-bg-hex");
+
+    function applyHexColor(hexStr) {
+      let cleaned = hexStr.trim().toUpperCase();
+      if (!cleaned.startsWith("#")) cleaned = "#" + cleaned;
+      if (/^#[0-9A-F]{6}$/.test(cleaned)) {
+        appSettings.bgColor = cleaned;
+        inputBgPicker.value = cleaned.toLowerCase();
+        inputBgHex.value = cleaned;
+      }
+    }
+
+    inputBgPicker.addEventListener("input", (e) => {
+      applyHexColor(e.target.value);
+    });
+
+    inputBgHex.addEventListener("input", (e) => {
+      applyHexColor(e.target.value);
+    });
+
+    document.querySelectorAll(".hex-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyHexColor(btn.dataset.hex);
+      });
+    });
+
+    // 카드 등장 방향 설정 (우측 / 좌측)
+    const labelDirRight = document.getElementById("label-dir-right");
+    const labelDirLeft = document.getElementById("label-dir-left");
+
+    function updateDirectionUI(dir) {
+      appSettings.spawnDirection = dir;
+      if (dir === "right") {
+        labelDirRight.className = "flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-sm";
+        labelDirLeft.className = "flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-gray-800 border-gray-700 text-gray-300 font-semibold text-sm";
+      } else {
+        labelDirLeft.className = "flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-sm";
+        labelDirRight.className = "flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-gray-800 border-gray-700 text-gray-300 font-semibold text-sm";
+      }
+    }
+
+    document.querySelectorAll('input[name="spawn-direction"]').forEach((radio) => {
+      radio.addEventListener("change", (e) => {
+        updateDirectionUI(e.target.value);
+      });
+    });
+
+    // 카드 등장 상하 위치(위/아래) 슬라이더 및 프리셋 버튼
+    const inputSpawnY = document.getElementById("input-spawn-y");
+    const valSpawnY = document.getElementById("val-spawn-y");
+
+    function applySpawnYOffset(yVal) {
+      const num = Number(yVal) || 0;
+      appSettings.spawnYOffset = num;
+      inputSpawnY.value = String(num);
+
+      if (num === 0) {
+        valSpawnY.textContent = "기본 위치 (0px)";
+      } else if (num > 0) {
+        valSpawnY.textContent = `위로 +${num}px`;
+      } else {
+        valSpawnY.textContent = `아래로 ${num}px`;
+      }
+
+      // 화면에 활성화된 카드가 있다면 즉시 위치 반영
+      if (activeCard) {
+        const newShowcaseY = (STAGE_H / 2) - appSettings.spawnYOffset;
+        activeCard.y = newShowcaseY;
+        if (activeCard.anim) {
+          activeCard.anim.targetY = newShowcaseY;
+        }
+      }
+    }
+
+    inputSpawnY.addEventListener("input", (e) => {
+      applySpawnYOffset(e.target.value);
+    });
+
+    document.querySelectorAll(".spawn-y-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applySpawnYOffset(btn.dataset.sy);
+      });
+    });
+
+    // 카드 정지 좌우 위치(좌/우) 슬라이더 및 프리셋 버튼
+    const inputSpawnX = document.getElementById("input-spawn-x");
+    const valSpawnX = document.getElementById("val-spawn-x");
+
+    function applySpawnXOffset(xVal) {
+      const num = Number(xVal) || 0;
+      appSettings.spawnXOffset = num;
+      inputSpawnX.value = String(num);
+
+      if (num === 0) {
+        valSpawnX.textContent = "기본 위치 (0px)";
+      } else if (num > 0) {
+        valSpawnX.textContent = `우측으로 +${num}px`;
+      } else {
+        valSpawnX.textContent = `좌측으로 ${num}px`;
+      }
+
+      // 화면에 활성화된 카드가 있다면 즉시 위치 반영
+      if (activeCard) {
+        const isRight = appSettings.spawnDirection === "right";
+        const baseOnScreenX = isRight ? STAGE_W - 350 : 350;
+        const newShowcaseX = baseOnScreenX + appSettings.spawnXOffset;
+        activeCard.x = newShowcaseX;
+        if (activeCard.anim) {
+          activeCard.anim.targetX = newShowcaseX;
+        }
+      }
+    }
+
+    inputSpawnX.addEventListener("input", (e) => {
+      applySpawnXOffset(e.target.value);
+    });
+
+    document.querySelectorAll(".spawn-x-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applySpawnXOffset(btn.dataset.sx);
+      });
+    });
+
+    // 타이밍 및 배율 설정
+    document.getElementById("input-move-sec").addEventListener("input", (e) => {
+      const sec = parseFloat(e.target.value);
+      appSettings.moveDurationMs = Math.round(sec * 1000);
+      document.getElementById("val-move-sec").textContent = `${sec.toFixed(2)}초`;
+    });
+
+    document.getElementById("input-pause-sec").addEventListener("input", (e) => {
+      const sec = parseFloat(e.target.value);
+      appSettings.pauseDurationMs = Math.round(sec * 1000);
+      document.getElementById("val-pause-sec").textContent = `${sec.toFixed(2)}초`;
+    });
+
+    document.getElementById("input-card-scale").addEventListener("input", (e) => {
+      const scale = parseFloat(e.target.value);
+      appSettings.cardScale = scale;
+      document.getElementById("val-card-scale").textContent = `${scale.toFixed(2)}x`;
+      
+      if (activeCard) {
+        activeCard.scale = scale;
+      }
+    });
+
+    // 미리보기 재생 및 인코딩 버튼
+    document.getElementById("btn-preview").addEventListener("click", () => {
+      if (isEncoding) return;
+      runFullAnimationSequence(false);
+    });
+
+    document.getElementById("btn-encode").addEventListener("click", () => {
+      startVideoEncoding();
+    });
+
+    // 초기화 및 애니메이션 루프 시작
+    window.onload = () => {
+      inputSingleCard.value = singleCardConfig.dbImage;
+      thumbSingleCard.dataset.dbKey = singleCardConfig.dbImage;
+      resetToIdleState();
+      requestAnimationFrame(renderLoop);
+      updateMainStatus("대기 중", "bg-emerald-400");
+    };
+  </script>
+</body>
+</html>
