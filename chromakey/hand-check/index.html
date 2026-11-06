@@ -368,8 +368,77 @@
         <!-- 3. 부채꼴 손패 및 타이밍 세부 설정 -->
         <div class="space-y-4">
           <label class="block text-sm font-bold text-gray-200">
-            손패 위치 및 애니메이션 세부 조정
+            손패 형태·간격·위치 및 애니메이션 세부 조정
           </label>
+
+          <!-- 손패 배치 형태 선택 (부채꼴 vs 평행 정렬) -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between items-center text-xs text-gray-200 font-medium">
+              <span>손패 배치 형태</span>
+              <span id="val-hand-mode" class="font-mono text-indigo-400">부채꼴 형태</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <button type="button" id="btn-mode-fan" class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-xs">
+                <span>🌈 부채꼴 형태 (곡선)</span>
+              </button>
+              <button type="button" id="btn-mode-parallel" class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-gray-900 border-gray-700 text-gray-300 font-semibold text-xs">
+                <span>📏 평행 형태 (수평 일자)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 카드 간 간격 조절 (중심각과 독립 동작) -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>카드 간 간격 (좌우 간격)</span>
+              <span id="val-card-spacing" class="font-mono text-indigo-400">150px</span>
+            </div>
+            <input type="range" id="input-card-spacing" min="30" max="320" step="5" value="150" class="w-full accent-indigo-500" />
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span>좁게 겹침 (30px)</span>
+              <span>기본 (150px)</span>
+              <span>넓게 펼침 (320px)</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-space="80" class="card-spacing-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                좁게 (80px)
+              </button>
+              <button type="button" data-space="115" class="card-spacing-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                조밀 (115px)
+              </button>
+              <button type="button" data-space="150" class="card-spacing-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                기본 (150px)
+              </button>
+              <button type="button" data-space="200" class="card-spacing-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                넓게 (200px)
+              </button>
+              <button type="button" data-space="260" class="card-spacing-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                안 겹치게 (260px)
+              </button>
+            </div>
+          </div>
+
+          <!-- 손패 중심각 조절 (부채꼴 형태일 때 활성) -->
+          <div id="fan-angle-controls-wrap" class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-3 transition">
+            <div class="flex justify-between items-center text-xs text-gray-200 font-medium">
+              <span>손패 부채꼴 중심각 설정</span>
+              <span id="val-fan-angle" class="font-mono text-indigo-400">카드당 8° (최대 52°)</span>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] text-gray-400 mb-1">
+                <span>카드 1장당 벌어지는 각도</span>
+                <span id="val-per-card-angle" class="font-mono text-gray-300">8.0°</span>
+              </div>
+              <input type="range" id="input-fan-angle" min="0" max="20" step="0.5" value="8" class="w-full accent-indigo-500" />
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] text-gray-400 mb-1">
+                <span>최대 전체 중심각 한도 (카드가 많아질 때 제한)</span>
+                <span id="val-max-fan-angle" class="font-mono text-gray-300">52°</span>
+              </div>
+              <input type="range" id="input-max-fan-angle" min="10" max="120" step="2" value="52" class="w-full accent-indigo-500" />
+            </div>
+          </div>
 
           <!-- 손패 상하(위/아래) 위치 조절 -->
           <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
@@ -401,14 +470,6 @@
                 화면 상단 (+620)
               </button>
             </div>
-          </div>
-
-          <div>
-            <div class="flex justify-between text-xs text-gray-300 mb-1">
-              <span>카드당 부채꼴 중심각 증가량</span>
-              <span id="val-fan-angle" class="font-mono text-indigo-400">8° (최대 52°)</span>
-            </div>
-            <input type="range" id="input-fan-angle" min="3" max="15" step="0.5" value="8" class="w-full accent-indigo-500" />
           </div>
 
           <div>
@@ -458,6 +519,8 @@
       spawnDirection: "right",     // 'right' | 'left'
       spawnYOffset: 0,             // 카드 등장 상하 위치 오프셋 (+: 위로 이동, -: 아래로 이동)
       handYOffset: 0,              // 손패 상하 위치 오프셋 (+: 위로 이동, -: 아래로 이동)
+      isParallelHand: false,       // true면 평행(수평 일자) 배치, false면 부채꼴 배치
+      cardSpacing: 150,            // 카드 간 좌우 간격 (px) - 중심각과 독립
       anglePerCardDeg: 8,          // 카드 1장당 벌어지는 중심각
       maxTotalAngleDeg: 52,        // 최대 중심각 한도
       pauseDurationMs: 650,        // 등장 후 잠시 멈추는 시간 (ms)
@@ -756,26 +819,37 @@
       const count = handCards.length;
       if (count === 0) return;
 
-      // 2. 카드 개수에 따른 부채꼴 중심각(totalAngleDeg) 계산
+      // 2. 손패 평행 모드 여부 및 중심각 계산
+      const isParallel = appSettings.isParallelHand;
       const maxAngle = appSettings.maxTotalAngleDeg;
       const perCard = appSettings.anglePerCardDeg;
-      const totalAngleDeg = count === 1 ? 0 : Math.min(maxAngle, (count - 1) * perCard);
+      const totalAngleDeg = (isParallel || count === 1)
+        ? 0
+        : Math.min(maxAngle, (count - 1) * perCard);
 
-      // 부채꼴의 원점(Pivot): 화면 하단 중앙 아래쪽 (handYOffset 적용: +면 위로, -면 아래로)
-      const fanRadius = 1150;
-      const pivotX = STAGE_W / 2;
-      const pivotY = STAGE_H + fanRadius - 215 - appSettings.handYOffset;
+      // 기준점: 화면 중앙 X 및 기본 손패 높이 Y (handYOffset 적용)
+      const centerX = STAGE_W / 2;
+      const baseY = STAGE_H - 215 - appSettings.handYOffset;
+      const spacing = appSettings.cardSpacing * appSettings.cardScale;
 
       handCards.forEach((card, index) => {
-        // 왼쪽(-totalAngle/2)부터 오른쪽(+totalAngle/2)까지 균등 분배
-        const angleDeg = count === 1
+        // 중앙 기준 상대 인덱스 (예: 5장이면 -2, -1, 0, +1, +2)
+        const relIndex = index - (count - 1) / 2;
+
+        // 좌우 간격(cardSpacing)으로 X 좌표 결정 (중심각과 독립)
+        const dx = relIndex * spacing;
+        const targetX = centerX + dx;
+
+        // 각도 계산 (평행 모드이거나 1장일 때는 0도)
+        const angleDeg = (isParallel || count === 1)
           ? 0
           : -totalAngleDeg / 2 + (index * (totalAngleDeg / (count - 1)));
         const angleRad = (angleDeg * Math.PI) / 180;
 
-        const targetX = pivotX + fanRadius * Math.sin(angleRad);
-        const targetY = pivotY - fanRadius * Math.cos(angleRad);
-        const targetRot = angleRad;
+        // 부채꼴 곡선 높이(Y) 보정: 평행 모드면 일직선(0), 부채꼴이면 각도에 맞춘 자연스러운 호(Arc) 형성
+        const archDrop = isParallel ? 0 : dx * Math.tan(angleRad / 2);
+        const targetY = baseY + archDrop;
+        const targetRot = isParallel ? 0 : angleRad;
         const targetScale = appSettings.cardScale;
 
         if (!animateSmoothly) {
@@ -1697,10 +1771,69 @@
       });
     });
 
-    // 부채꼴 각도 / 멈춤 시간 / 카드 배율 슬라이더
+    // 손패 배치 형태 (부채꼴 vs 평행 정렬) 토글
+    const btnModeFan = document.getElementById("btn-mode-fan");
+    const btnModeParallel = document.getElementById("btn-mode-parallel");
+    const valHandMode = document.getElementById("val-hand-mode");
+    const fanAngleControlsWrap = document.getElementById("fan-angle-controls-wrap");
+
+    function applyHandMode(isParallel) {
+      appSettings.isParallelHand = Boolean(isParallel);
+      if (appSettings.isParallelHand) {
+        valHandMode.textContent = "평행 형태 (수평 일자)";
+        btnModeParallel.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-xs";
+        btnModeFan.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-gray-900 border-gray-700 text-gray-300 font-semibold text-xs";
+        fanAngleControlsWrap.classList.add("opacity-40", "pointer-events-none");
+      } else {
+        valHandMode.textContent = "부채꼴 형태";
+        btnModeFan.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-xs";
+        btnModeParallel.className = "flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border transition bg-gray-900 border-gray-700 text-gray-300 font-semibold text-xs";
+        fanAngleControlsWrap.classList.remove("opacity-40", "pointer-events-none");
+      }
+      recalculateHandFanTargets(true);
+    }
+
+    btnModeFan.addEventListener("click", () => applyHandMode(false));
+    btnModeParallel.addEventListener("click", () => applyHandMode(true));
+
+    // 카드 간 간격 슬라이더 및 프리셋 버튼
+    const inputCardSpacing = document.getElementById("input-card-spacing");
+    const valCardSpacing = document.getElementById("val-card-spacing");
+
+    function applyCardSpacing(spaceVal) {
+      const num = Number(spaceVal) || 150;
+      appSettings.cardSpacing = num;
+      inputCardSpacing.value = String(num);
+      valCardSpacing.textContent = `${num}px`;
+      recalculateHandFanTargets(true);
+    }
+
+    inputCardSpacing.addEventListener("input", (e) => {
+      applyCardSpacing(e.target.value);
+    });
+
+    document.querySelectorAll(".card-spacing-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyCardSpacing(btn.dataset.space);
+      });
+    });
+
+    // 부채꼴 각도 (카드당 각도 & 최대 중심각 한도) / 멈춤 시간 / 카드 배율 슬라이더
+    function updateFanAngleLabels() {
+      document.getElementById("val-fan-angle").textContent = `카드당 ${appSettings.anglePerCardDeg}° (최대 ${appSettings.maxTotalAngleDeg}°)`;
+      document.getElementById("val-per-card-angle").textContent = `${appSettings.anglePerCardDeg.toFixed(1)}°`;
+      document.getElementById("val-max-fan-angle").textContent = `${appSettings.maxTotalAngleDeg}°`;
+    }
+
     document.getElementById("input-fan-angle").addEventListener("input", (e) => {
       appSettings.anglePerCardDeg = parseFloat(e.target.value);
-      document.getElementById("val-fan-angle").textContent = `${appSettings.anglePerCardDeg}° (최대 ${appSettings.maxTotalAngleDeg}°)`;
+      updateFanAngleLabels();
+      recalculateHandFanTargets(true);
+    });
+
+    document.getElementById("input-max-fan-angle").addEventListener("input", (e) => {
+      appSettings.maxTotalAngleDeg = parseFloat(e.target.value);
+      updateFanAngleLabels();
       recalculateHandFanTargets(true);
     });
 
