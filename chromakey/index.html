@@ -130,16 +130,23 @@
           </h2>
           <!-- R2 경로 실시간 설정 및 테스트 바 -->
           <div class="mt-2 flex flex-wrap items-center gap-2">
-            <span class="text-xs text-gray-400">R2 폴더 경로:</span>
+            <span class="text-xs text-gray-400">R2 URL:</span>
+            <div class="relative flex-1 min-w-[240px] flex items-center">
+              <input type="password" id="input-custom-r2-base" value="" placeholder="https://pub-xxxxxxxx.r2.dev (직접 입력)"
+                autocomplete="off" spellcheck="false"
+                class="w-full pl-2.5 pr-8 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 font-mono focus:outline-none focus:border-indigo-500" />
+              <button type="button" id="btn-toggle-r2-visibility" class="absolute right-2 text-gray-400 hover:text-gray-200 text-xs" title="URL 표시/숨기기">
+                👁️
+              </button>
+            </div>
             <select id="select-r2-path-preset" class="px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-emerald-400 font-mono focus:outline-none focus:border-indigo-500">
-              <option value="auto">자동 탐색 (carddata 포함/제외 모두 시도)</option>
-              <option value="carddata/Test/card_image/">/carddata/Test/card_image/ (폴더명 포함)</option>
-              <option value="Test/card_image/">/Test/card_image/ (carddata가 버킷명일 때)</option>
+              <option value="auto">자동 경로 탐색 (/carddata 포함·제외 모두 시도)</option>
+              <option value="carddata/Test/card_image/">/carddata/Test/card_image/</option>
+              <option value="Test/card_image/">/Test/card_image/</option>
+              <option value="direct">직접 입력한 전체 경로 그대로 사용</option>
             </select>
-            <input type="text" id="input-custom-r2-base" value="https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/"
-              class="flex-1 min-w-[260px] px-2.5 py-1 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 font-mono focus:outline-none focus:border-indigo-500" />
-            <span id="r2-connection-badge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-              이미지 확인 대기
+            <span id="r2-connection-badge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-amber-400 border border-gray-700">
+              R2 URL을 입력해 주세요
             </span>
           </div>
         </div>
@@ -246,6 +253,31 @@
       <!-- 본문 -->
       <div class="p-6 space-y-6 overflow-y-auto max-h-[78vh]">
         
+        <!-- 0. Cloudflare R2 보안 URL 입력 -->
+        <div class="space-y-2.5 p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80">
+          <div class="flex items-center justify-between">
+            <label class="block text-sm font-bold text-gray-200">
+              Cloudflare R2 Public URL (보안 직접 입력)
+            </label>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              HTML 코드 미포함
+            </span>
+          </div>
+          <p class="text-xs text-gray-400">
+            보안을 위해 코드 내에 URL을 저장하지 않습니다. 사용하실 R2 주소(예: <code class="text-gray-300">https://pub-xxxx.r2.dev</code>)를 직접 입력해 주세요.
+          </p>
+          <div class="flex items-center gap-2">
+            <input type="password" id="input-settings-r2-url" value="" placeholder="https://pub-xxxxxxxx.r2.dev"
+              autocomplete="off" spellcheck="false"
+              class="flex-1 px-3 py-2 rounded-xl bg-gray-900 border border-gray-600 text-white font-mono text-xs focus:outline-none focus:border-indigo-500" />
+            <button type="button" id="btn-settings-toggle-r2" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-600 text-xs font-medium transition">
+              표시
+            </button>
+          </div>
+        </div>
+
+        <hr class="border-gray-800" />
+
         <!-- 1. 크로마키 배경색 설정 (HEX) -->
         <div class="space-y-2.5">
           <label class="block text-sm font-bold text-gray-200">
@@ -277,13 +309,13 @@
 
         <hr class="border-gray-800" />
 
-        <!-- 2. 카드가 추가되는 방향 설정 -->
-        <div class="space-y-2.5">
+        <!-- 2. 카드가 추가되는 방향 및 상하 등장 위치 설정 -->
+        <div class="space-y-3.5">
           <label class="block text-sm font-bold text-gray-200">
-            카드 추가 등장 방향
+            카드 추가 등장 방향 및 위치
           </label>
           <p class="text-xs text-gray-400">
-            카드가 추가될 때 어느 방향에서 등장하여 잠시 멈춘 뒤 손패로 들어갈지 선택합니다.
+            카드가 추가될 때 어느 방향과 높이(위/아래)에서 등장하여 잠시 멈춘 뒤 손패로 들어갈지 설정합니다.
           </p>
           <div class="grid grid-cols-2 gap-3">
             <label id="label-dir-right" class="flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition bg-indigo-600/20 border-indigo-500 text-white font-semibold text-sm">
@@ -297,6 +329,38 @@
               <span>좌측에서 등장</span>
             </label>
           </div>
+
+          <!-- 카드 등장 상하(위/아래) 위치 조절 -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>카드 등장 상하 위치 (아래 ↔ 위)</span>
+              <span id="val-spawn-y" class="font-mono text-indigo-400">기본 위치 (0px)</span>
+            </div>
+            <input type="range" id="input-spawn-y" min="-400" max="400" step="5" value="0" class="w-full accent-indigo-500" />
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span>↓ 화면 아래로 (-400px)</span>
+              <span>중앙 기본 (0px)</span>
+              <span>↑ 화면 위로 (+400px)</span>
+            </div>
+            <!-- 빠른 등장 위치 프리셋 버튼 -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-sy="-250" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                하단 (-250)
+              </button>
+              <button type="button" data-sy="-120" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중하단 (-120)
+              </button>
+              <button type="button" data-sy="0" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중앙 기본 (0)
+              </button>
+              <button type="button" data-sy="140" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                중상단 (+140)
+              </button>
+              <button type="button" data-sy="280" class="spawn-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                상단 (+280)
+              </button>
+            </div>
+          </div>
         </div>
 
         <hr class="border-gray-800" />
@@ -304,8 +368,40 @@
         <!-- 3. 부채꼴 손패 및 타이밍 세부 설정 -->
         <div class="space-y-4">
           <label class="block text-sm font-bold text-gray-200">
-            부채꼴 및 애니메이션 세부 조정
+            손패 위치 및 애니메이션 세부 조정
           </label>
+
+          <!-- 손패 상하(위/아래) 위치 조절 -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>손패 상하 위치 (아래 ↔ 위)</span>
+              <span id="val-hand-y" class="font-mono text-indigo-400">기본 위치 (0px)</span>
+            </div>
+            <input type="range" id="input-hand-y" min="-250" max="700" step="5" value="0" class="w-full accent-indigo-500" />
+            <div class="flex justify-between text-[11px] text-gray-400">
+              <span>↓ 화면 아래로 (-250px)</span>
+              <span>기본 (0px)</span>
+              <span>↑ 화면 위로 (+700px)</span>
+            </div>
+            <!-- 빠른 위치 프리셋 버튼 -->
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-y="-120" class="hand-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                하단 반걸침 (-120)
+              </button>
+              <button type="button" data-y="0" class="hand-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                하단 기본 (0)
+              </button>
+              <button type="button" data-y="140" class="hand-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                살짝 위로 (+140)
+              </button>
+              <button type="button" data-y="320" class="hand-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                화면 중앙 (+320)
+              </button>
+              <button type="button" data-y="620" class="hand-y-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                화면 상단 (+620)
+              </button>
+            </div>
+          </div>
 
           <div>
             <div class="flex justify-between text-xs text-gray-300 mb-1">
@@ -348,11 +444,11 @@
   =========================================== -->
   <script>
     /**
-     * Cloudflare R2 이미지 기본 도메인 및 경로 설정
+     * Cloudflare R2 이미지 주소 상태 (보안을 위해 코드 내에 URL을 하드코딩하지 않음)
+     * 사용자가 UI에서 직접 입력한 URL만 런타임 메모리에 유지합니다.
      */
-    const R2_ORIGIN = "https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev";
-    let r2PathMode = "auto"; // 'auto' | 'carddata/Test/card_image/' | 'Test/card_image/' | 'custom'
-    let customR2BaseUrl = "https://pub-d491a476fd314c26b2f00de3709a34f0.r2.dev/carddata/Test/card_image/";
+    let r2PathMode = "auto"; // 'auto' | 'carddata/Test/card_image/' | 'Test/card_image/' | 'direct'
+    let customR2BaseUrl = "";
 
     /**
      * 전역 환경 설정 상태
@@ -360,6 +456,8 @@
     const appSettings = {
       bgColor: "#00FF00",          // 기본값: 크로마키 초록
       spawnDirection: "right",     // 'right' | 'left'
+      spawnYOffset: 0,             // 카드 등장 상하 위치 오프셋 (+: 위로 이동, -: 아래로 이동)
+      handYOffset: 0,              // 손패 상하 위치 오프셋 (+: 위로 이동, -: 아래로 이동)
       anglePerCardDeg: 8,          // 카드 1장당 벌어지는 중심각
       maxTotalAngleDeg: 52,        // 최대 중심각 한도
       pauseDurationMs: 650,        // 등장 후 잠시 멈추는 시간 (ms)
@@ -403,28 +501,45 @@
     }
 
     /**
-     * 입력된 번호에 대해 시도할 후보 URL 목록 생성
-     * - R2에서 버킷 이름이 'carddata'인 경우 URL에 'carddata/'가 빠진 '/Test/card_image/'가 실제 주소가 됩니다.
-     * - 반대로 버킷 안에 'carddata' 폴더가 있는 경우 '/carddata/Test/card_image/'가 실제 주소가 됩니다.
-     * 두 경우를 모두 자동으로 찾도록 후보군을 생성합니다.
+     * 사용자가 입력한 R2 주소에서 도메인(Origin) 추출 헬퍼
+     */
+    function extractOriginFromInput(rawUrl) {
+      const trimmed = String(rawUrl || "").trim().replace(/\/+$/, "");
+      if (!trimmed) return "";
+      try {
+        const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+        return parsed.origin;
+      } catch (_) {
+        return "";
+      }
+    }
+
+    /**
+     * 사용자가 직접 입력한 R2 URL과 번호를 조합하여 후보 URL 목록 생성
      */
     function getCandidateR2Urls(dbImageRaw) {
       const fileName = getCleanImageFileName(dbImageRaw);
-      if (!fileName) return [];
+      const rawInput = String(customR2BaseUrl || "").trim();
+      if (!fileName || !rawInput) return [];
 
-      const customNormalized = customR2BaseUrl.endsWith("/") ? customR2BaseUrl : `${customR2BaseUrl}/`;
+      const normalizedInput = (rawInput.startsWith("http") ? rawInput : `https://${rawInput}`).replace(/\/+$/, "");
+      const origin = extractOriginFromInput(normalizedInput);
 
-      if (r2PathMode !== "auto") {
-        return [`${customNormalized}${fileName}`];
+      if (r2PathMode === "direct" || !origin) {
+        return [`${normalizedInput}/${fileName}`];
       }
 
-      // 자동 탐색 모드: 사용자가 입력한 기본 주소 + carddata 제외 주소 + carddata 포함 주소
+      if (r2PathMode === "carddata/Test/card_image/" || r2PathMode === "Test/card_image/") {
+        return [`${origin}/${r2PathMode}${fileName}`];
+      }
+
+      // 자동 탐색 모드: 사용자가 전체 경로를 넣었든 도메인만 넣었든 모두 탐색
       const urls = [
-        `${customNormalized}${fileName}`,
-        `${R2_ORIGIN}/Test/card_image/${fileName}`,
-        `${R2_ORIGIN}/carddata/Test/card_image/${fileName}`,
-        `${R2_ORIGIN}/test/card_image/${fileName}`,
-        `${R2_ORIGIN}/carddata/test/card_image/${fileName}`
+        `${normalizedInput}/${fileName}`,
+        `${origin}/Test/card_image/${fileName}`,
+        `${origin}/carddata/Test/card_image/${fileName}`,
+        `${origin}/test/card_image/${fileName}`,
+        `${origin}/carddata/test/card_image/${fileName}`
       ];
       return [...new Set(urls)];
     }
@@ -508,6 +623,11 @@
       imageCache.set(key, entry);
 
       const candidateUrls = getCandidateR2Urls(key);
+      if (candidateUrls.length === 0) {
+        entry.status = "no_url";
+        updateR2ConnectionBadge(false, "", false, key, true);
+        return entry;
+      }
 
       // 단일 URL을 다양한 방식(직접 CORS -> 프록시 CORS -> 일반 로드)으로 시도하는 헬퍼
       function tryLoadSingleUrl(targetUrl) {
@@ -542,7 +662,7 @@
             entry.source = res.img;
             entry.resolvedUrl = res.url;
             entry.corsReady = res.corsReady;
-            updateR2ConnectionBadge(true, res.url, res.corsReady, key);
+            updateR2ConnectionBadge(true, res.url, res.corsReady, key, false);
             // 모달이 열려 있다면 썸네일 갱신
             refreshThumbnailsInModal(key, res.url);
             return;
@@ -551,17 +671,23 @@
           }
         }
         entry.status = "error";
-        updateR2ConnectionBadge(false, candidateUrls[0] || "", false, key);
+        updateR2ConnectionBadge(false, candidateUrls[0] || "", false, key, false);
       })();
 
       return entry;
     }
 
-    function updateR2ConnectionBadge(success, url, corsReady, key) {
+    function updateR2ConnectionBadge(success, url, corsReady, key, isMissingUrl = false) {
       const badge = document.getElementById("r2-connection-badge");
       if (!badge) return;
+      if (isMissingUrl) {
+        badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40";
+        badge.textContent = "R2 URL을 입력해 주세요";
+        return;
+      }
+      const origin = extractOriginFromInput(url);
+      const shortPath = origin ? url.replace(origin, "") : url;
       if (success) {
-        const shortPath = url.replace(R2_ORIGIN, "");
         if (corsReady) {
           badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
           badge.textContent = `✓ 연결 성공 (${shortPath})`;
@@ -571,7 +697,7 @@
         }
       } else {
         badge.className = "text-[11px] px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40";
-        badge.textContent = `✗ '${key}.webp' 파일을 찾을 수 없음 (번호 또는 경로 확인)`;
+        badge.textContent = `✗ '${key}.webp' 파일을 찾을 수 없음 (URL 또는 번호 확인)`;
       }
     }
 
@@ -635,10 +761,10 @@
       const perCard = appSettings.anglePerCardDeg;
       const totalAngleDeg = count === 1 ? 0 : Math.min(maxAngle, (count - 1) * perCard);
 
-      // 부채꼴의 원점(Pivot): 화면 하단 중앙 아래쪽
+      // 부채꼴의 원점(Pivot): 화면 하단 중앙 아래쪽 (handYOffset 적용: +면 위로, -면 아래로)
       const fanRadius = 1150;
       const pivotX = STAGE_W / 2;
-      const pivotY = STAGE_H + fanRadius - 215;
+      const pivotY = STAGE_H + fanRadius - 215 - appSettings.handYOffset;
 
       handCards.forEach((card, index) => {
         // 왼쪽(-totalAngle/2)부터 오른쪽(+totalAngle/2)까지 균등 분배
@@ -864,9 +990,9 @@
         const isRight = appSettings.spawnDirection === "right";
         const startX = isRight ? STAGE_W + 260 : -260;
         const showcaseX = isRight ? STAGE_W - 380 : 380;
-        const showcaseY = STAGE_H * 0.43;
+        const showcaseY = (STAGE_H * 0.45) - appSettings.spawnYOffset;
 
-        // 1단계: 설정된 방향(우측/좌측)에서 등장
+        // 1단계: 설정된 방향(우측/좌측) 및 설정된 상하 높이에서 등장
         const enterDuration = 450;
         stagingCard = {
           uid,
@@ -1350,42 +1476,60 @@
 
     /**
      * ==========================================
-     * 버튼 및 모달 이벤트 연결
+     * 모달 및 컨트롤 버튼 이벤트 바인딩
      * ==========================================
      */
     const modalCards = document.getElementById("modal-cards");
     const modalSettings = document.getElementById("modal-settings");
 
-    // 카드 목록 모달 열기/닫기
+    // 카드 목록 모달 열기
     document.getElementById("btn-open-cards").addEventListener("click", () => {
       renderAllBars();
       modalCards.classList.remove("hidden");
       modalCards.classList.add("flex");
     });
 
-    // R2 경로 프리셋 및 직접 입력 이벤트
+    // R2 경로 프리셋 및 직접 입력 이벤트 (카드 목록 모달 & 설정 모달 양방향 동기화)
     const selectR2PathPreset = document.getElementById("select-r2-path-preset");
     const inputCustomR2Base = document.getElementById("input-custom-r2-base");
+    const inputSettingsR2Url = document.getElementById("input-settings-r2-url");
+    const btnToggleR2Visibility = document.getElementById("btn-toggle-r2-visibility");
+    const btnSettingsToggleR2 = document.getElementById("btn-settings-toggle-r2");
+
+    function applyNewR2Url(newUrl) {
+      customR2BaseUrl = String(newUrl || "").trim();
+      inputCustomR2Base.value = customR2BaseUrl;
+      inputSettingsR2Url.value = customR2BaseUrl;
+      imageCache.clear();
+      preloadAllConfiguredImages();
+      renderAllBars();
+    }
 
     selectR2PathPreset.addEventListener("change", (e) => {
-      const val = e.target.value;
-      if (val === "auto") {
-        r2PathMode = "auto";
-      } else {
-        r2PathMode = "custom";
-        customR2BaseUrl = `${R2_ORIGIN}/${val}`;
-        inputCustomR2Base.value = customR2BaseUrl;
-      }
+      r2PathMode = e.target.value;
       imageCache.clear();
       preloadAllConfiguredImages();
       renderAllBars();
     });
 
-    inputCustomR2Base.addEventListener("change", (e) => {
-      customR2BaseUrl = e.target.value.trim();
-      imageCache.clear();
-      preloadAllConfiguredImages();
-      renderAllBars();
+    inputCustomR2Base.addEventListener("input", (e) => {
+      applyNewR2Url(e.target.value);
+    });
+
+    inputSettingsR2Url.addEventListener("input", (e) => {
+      applyNewR2Url(e.target.value);
+    });
+
+    // URL 마스킹(비밀번호 형태) 토글 버튼
+    btnToggleR2Visibility.addEventListener("click", () => {
+      const isHidden = inputCustomR2Base.type === "password";
+      inputCustomR2Base.type = isHidden ? "text" : "password";
+    });
+
+    btnSettingsToggleR2.addEventListener("click", () => {
+      const isHidden = inputSettingsR2Url.type === "password";
+      inputSettingsR2Url.type = isHidden ? "text" : "password";
+      btnSettingsToggleR2.textContent = isHidden ? "숨김" : "표시";
     });
 
     function closeCardsModalAndApply() {
@@ -1484,6 +1628,72 @@
     document.querySelectorAll('input[name="spawn-direction"]').forEach((radio) => {
       radio.addEventListener("change", (e) => {
         updateDirectionUI(e.target.value);
+      });
+    });
+
+    // 카드 등장 상하 위치(위/아래) 슬라이더 및 프리셋 버튼
+    const inputSpawnY = document.getElementById("input-spawn-y");
+    const valSpawnY = document.getElementById("val-spawn-y");
+
+    function applySpawnYOffset(yVal) {
+      const num = Number(yVal) || 0;
+      appSettings.spawnYOffset = num;
+      inputSpawnY.value = String(num);
+
+      if (num === 0) {
+        valSpawnY.textContent = "기본 위치 (0px)";
+      } else if (num > 0) {
+        valSpawnY.textContent = `위로 +${num}px`;
+      } else {
+        valSpawnY.textContent = `아래로 ${num}px`;
+      }
+
+      // 만약 현재 등장 연출 중인 카드가 화면에 멈춰 있다면 실시간으로 위치 반영
+      if (stagingCard) {
+        const newShowcaseY = (STAGE_H * 0.45) - appSettings.spawnYOffset;
+        stagingCard.y = newShowcaseY;
+        if (stagingCard.anim) {
+          stagingCard.anim.targetY = newShowcaseY;
+        }
+      }
+    }
+
+    inputSpawnY.addEventListener("input", (e) => {
+      applySpawnYOffset(e.target.value);
+    });
+
+    document.querySelectorAll(".spawn-y-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applySpawnYOffset(btn.dataset.sy);
+      });
+    });
+
+    // 손패 상하 위치(위/아래) 슬라이더 및 프리셋 버튼
+    const inputHandY = document.getElementById("input-hand-y");
+    const valHandY = document.getElementById("val-hand-y");
+
+    function applyHandYOffset(yVal) {
+      const num = Number(yVal) || 0;
+      appSettings.handYOffset = num;
+      inputHandY.value = String(num);
+
+      if (num === 0) {
+        valHandY.textContent = "기본 위치 (0px)";
+      } else if (num > 0) {
+        valHandY.textContent = `위로 +${num}px`;
+      } else {
+        valHandY.textContent = `아래로 ${num}px`;
+      }
+      recalculateHandFanTargets(true);
+    }
+
+    inputHandY.addEventListener("input", (e) => {
+      applyHandYOffset(e.target.value);
+    });
+
+    document.querySelectorAll(".hand-y-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyHandYOffset(btn.dataset.y);
       });
     });
 
