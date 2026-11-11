@@ -541,7 +541,7 @@
           <!-- 인코딩 영상 프레임레이트(FPS) 설정 -->
           <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
             <div class="flex justify-between text-xs text-gray-200 font-medium">
-              <span>인코딩 영상 프레임 (MP4 고프레임)</span>
+              <span>인코딩 영상 프레임 (고프레임)</span>
               <span id="val-encode-fps" class="font-mono text-emerald-400">120 FPS (초고주사율)</span>
             </div>
             <input type="range" id="input-encode-fps" min="60" max="144" step="30" value="120" class="w-full accent-emerald-500" />
@@ -1478,7 +1478,7 @@
 
     /**
      * ==========================================
-     * 브라우저 직접 영상 인코딩 (.mp4 & 고프레임 렌더링)
+     * 브라우저 직접 영상 인코딩 (.webm / .mp4 자동 판단)
      * ==========================================
      */
     async function startVideoEncoding() {
@@ -1495,7 +1495,7 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>MP4 인코딩 중 (${targetFps}fps)...</span>
+        <span>인코딩 중 (${targetFps}fps)...</span>
       `;
 
       let highFpsTimer = null;
@@ -1505,11 +1505,11 @@
         preloadAllConfiguredImages();
         await new Promise(r => setTimeout(r, 300));
 
-        // 고프레임(기본 120 FPS) 스트림 캡처
+        // 고프레임 스트림 캡처
         const stream = canvas.captureStream(targetFps);
         const videoTrack = stream.getVideoTracks()[0];
 
-        // 모니터 주사율(60Hz) 한계를 넘어 목표 FPS(예: 120fps)마다 프레임을 강제 렌더링 및 푸시
+        // 모니터 주사율 한계를 넘어 목표 FPS마다 강제 렌더링
         const frameIntervalMs = 1000 / targetFps;
         highFpsTimer = setInterval(() => {
           renderSceneFrame(performance.now());
@@ -1520,23 +1520,26 @@
           }
         }, frameIntervalMs);
 
-        // .mp4 (H.264 High Profile Level 5.2 등 고프레임 호환) 코덱 최우선 선택
+        // 지원하는 코덱 최우선 선택 (실제 브라우저 환경에 따라 MP4가 안 되면 WebM으로 자동 폴백)
         const mimeCandidates = [
           "video/mp4;codecs=avc1.640034",
-          "video/mp4;codecs=avc1.640033",
-          "video/mp4;codecs=avc1.64002a",
-          "video/mp4;codecs=avc1.42E01E",
           "video/mp4;codecs=avc1",
           "video/mp4;codecs=h264",
-          "video/mp4",
           "video/webm;codecs=h264",
           "video/webm;codecs=vp9",
           "video/webm"
         ];
+        
         let selectedMime = "";
+        let finalExtension = "mp4"; // 기본 목표
+
         for (const mime of mimeCandidates) {
           if (window.MediaRecorder && MediaRecorder.isTypeSupported(mime)) {
             selectedMime = mime;
+            // 만약 브라우저가 MP4를 지원하지 않아 WebM으로 대체했다면, 확장자도 반드시 webm으로 맞춤 (0:01 버그 방지)
+            if (mime.includes("webm")) {
+              finalExtension = "webm";
+            }
             break;
           }
         }
@@ -1544,7 +1547,7 @@
         const chunks = [];
         const recorder = new MediaRecorder(stream, {
           mimeType: selectedMime || undefined,
-          videoBitsPerSecond: 28_000_000 // 28 Mbps 초고비트레이트 (고프레임 크로마키 경계선 선명도 유지)
+          videoBitsPerSecond: 28_000_000 // 28 Mbps 초고비트레이트 유지
         });
 
         recorder.ondataavailable = (e) => {
@@ -1557,25 +1560,37 @@
           recorder.onstop = resolve;
         });
 
-        // 고빈도 타임슬라이스(33ms)로 프레임 버퍼링 손실 방지하며 녹화 시작
-        recorder.start(33);
+        // timeslice(33) 옵션을 주면 청크가 쪼개지면서 파일 헤더 마감이 잘 안되는 브라우저가 많습니다.
+        // 옵션 없이 start()를 호출하여 마지막에 한 번에 파일을 마감하도록 하여 메타데이터 보존율을 높입니다.
+        recorder.start(); 
+        
+        if (finalExtension === "webm") {
+          updateMainStatus("녹화 중... (안내: 현재 브라우저는 .webm 포맷으로 최적화되어 인코딩됩니다)", "bg-rose-500 animate-ping");
+        }
+
         await runFullAnimationSequence(true);
         recorder.stop();
         await stopPromise;
 
-        // .mp4 파일로 다운로드 처리
+        // 최종 파일 다운로드
         const blob = new Blob(chunks, { type: selectedMime || "video/mp4" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        
         a.href = url;
-        a.download = `tcg_hand_chromakey_${timestamp}_${targetFps}fps.mp4`;
+        a.download = `tcg_hand_chromakey_${timestamp}_${targetFps}fps.${finalExtension}`;
+        
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-        updateMainStatus(`MP4 인코딩 완료! (${targetFps} FPS 영상 다운로드됨)`, "bg-emerald-400");
+        updateMainStatus(`인코딩 완료! (.${finalExtension} 영상 다운로드됨)`, "bg-emerald-400");
+        if (finalExtension === "webm") {
+          setTimeout(() => showModalFeedback("안내: 영상 길이 오류(0:01) 방지를 위해 현재 브라우저에 맞는 .webm으로 저장되었습니다. 프리미어 프로 등 편집기는 webm을 정상 지원합니다."), 500);
+        }
+
       } catch (err) {
         console.error("Encoding error:", err);
         updateMainStatus("인코딩 중 오류가 발생했습니다.", "bg-red-500");
