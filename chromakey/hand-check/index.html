@@ -122,12 +122,30 @@
       <!-- 모달 헤더 -->
       <div class="flex items-center justify-between px-6 py-4 bg-gray-800/80 border-b border-gray-700">
         <div class="flex-1 pr-4">
-          <h2 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>카드 목록 설정</span>
-            <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              우선도 오름차순(좌→우) 정렬
-            </span>
-          </h2>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>카드 목록 설정</span>
+              <span class="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                우선도 오름차순(좌→우) 정렬
+              </span>
+            </h2>
+            <!-- JSON 불러오기 / 내보내기 버튼 그룹 -->
+            <div class="flex items-center gap-2">
+              <input type="file" id="input-import-json" accept=".json,application/json" class="hidden" />
+              <button type="button" id="btn-import-json" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-700 text-amber-300 border border-gray-600 text-xs font-semibold transition shadow">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>JSON 불러오기</span>
+              </button>
+              <button type="button" id="btn-export-json" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 hover:bg-gray-700 text-emerald-300 border border-gray-600 text-xs font-semibold transition shadow">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>JSON 내보내기</span>
+              </button>
+            </div>
+          </div>
           <!-- R2 경로 실시간 설정 및 테스트 바 -->
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <span class="text-xs text-gray-400">R2 URL:</span>
@@ -163,7 +181,8 @@
         <div class="col-span-2">해당 카드 고유 번호</div>
         <div class="col-span-2">우선도 (숫자)</div>
         <div class="col-span-2 text-center">+/- (추가/제거)</div>
-        <div class="col-span-3">DB이미지명 (.webp)</div>
+        <div class="col-span-2">DB이미지명 (.webp)</div>
+        <div class="col-span-1 text-center" title="해당 카드 고유 번호를 제거하는 항목을 진행 목록 맨 끝에 추가합니다">제거 추가(–)</div>
         <div class="col-span-1 text-center">순서 변경</div>
         <div class="col-span-1 text-center">제거</div>
       </div>
@@ -222,9 +241,9 @@
       </div>
 
       <!-- 모달 푸터 -->
-      <div class="px-6 py-4 bg-gray-800/80 border-t border-gray-700 flex items-center justify-between">
-        <div class="text-xs text-gray-400">
-          💡 <strong>순서 변경</strong> 아이콘(☰)을 꾹 누른 채 위/아래로 움직이면 애니메이션 순서가 변경됩니다.
+      <div class="px-6 py-4 bg-gray-800/80 border-t border-gray-700 flex flex-wrap items-center justify-between gap-2">
+        <div id="modal-cards-feedback" class="text-xs text-gray-400">
+          💡 <strong>순서 변경</strong>(☰)을 꾹 눌러 위/아래로 이동하거나, <strong>– 버튼</strong>을 눌러 해당 카드의 제거 항목을 맨 마지막에 바로 추가할 수 있습니다.
         </div>
         <div class="flex items-center gap-2">
           <button id="btn-apply-cards" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg transition">
@@ -487,6 +506,29 @@
             </div>
             <input type="range" id="input-card-scale" min="0.6" max="1.5" step="0.05" value="1.0" class="w-full accent-indigo-500" />
           </div>
+
+          <!-- 인코딩 영상 프레임레이트(FPS) 설정 -->
+          <div class="p-3.5 rounded-xl bg-gray-800/60 border border-gray-700/80 space-y-2.5">
+            <div class="flex justify-between text-xs text-gray-200 font-medium">
+              <span>인코딩 영상 프레임 (MP4 고프레임)</span>
+              <span id="val-encode-fps" class="font-mono text-emerald-400">120 FPS (초고주사율)</span>
+            </div>
+            <input type="range" id="input-encode-fps" min="60" max="144" step="30" value="120" class="w-full accent-emerald-500" />
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <button type="button" data-fps="60" class="encode-fps-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                60 FPS (표준)
+              </button>
+              <button type="button" data-fps="90" class="encode-fps-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                90 FPS (부드러움)
+              </button>
+              <button type="button" data-fps="120" class="encode-fps-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                120 FPS (기본·권장)
+              </button>
+              <button type="button" data-fps="144" class="encode-fps-preset px-2.5 py-1 rounded-lg text-xs bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition">
+                144 FPS (최대)
+              </button>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -525,7 +567,8 @@
       maxTotalAngleDeg: 52,        // 최대 중심각 한도
       pauseDurationMs: 650,        // 등장 후 잠시 멈추는 시간 (ms)
       moveDurationMs: 600,         // 손패로 들어가는 이동 시간 (ms)
-      cardScale: 1.0               // 카드 렌더링 크기 배율
+      cardScale: 1.0,              // 카드 렌더링 크기 배율
+      encodeFps: 120               // 인코딩 영상 프레임레이트 (기본 120 FPS)
     };
 
     /**
@@ -1006,9 +1049,9 @@
     }
 
     /**
-     * 메인 렌더링 루프
+     * 캔버스 1프레임 그리기 함수 (일반 루프 및 고프레임 인코딩 타이머 공용)
      */
-    function renderLoop(now) {
+    function renderSceneFrame(now) {
       // 1. 크로마키 배경색 전체 칠하기
       ctx.fillStyle = appSettings.bgColor;
       ctx.fillRect(0, 0, STAGE_W, STAGE_H);
@@ -1031,7 +1074,15 @@
       if (stagingCard) {
         drawCardObject(stagingCard, now);
       }
+    }
 
+    /**
+     * 메인 렌더링 루프
+     */
+    function renderLoop(now) {
+      if (!isEncoding) {
+        renderSceneFrame(now);
+      }
       requestAnimationFrame(renderLoop);
     }
 
@@ -1188,13 +1239,14 @@
 
     /**
      * ==========================================
-     * 브라우저 직접 영상 인코딩 (Canvas CaptureStream + MediaRecorder)
+     * 브라우저 직접 영상 인코딩 (.mp4 & 고프레임 렌더링)
      * ==========================================
      */
     async function startVideoEncoding() {
       if (isEncoding) return;
       isEncoding = true;
 
+      const targetFps = Number(appSettings.encodeFps) || 120;
       const btnEncode = document.getElementById("btn-encode");
       const originalBtnHtml = btnEncode.innerHTML;
       btnEncode.disabled = true;
@@ -1204,23 +1256,43 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>인코딩 중...</span>
+        <span>MP4 인코딩 중 (${targetFps}fps)...</span>
       `;
 
+      let highFpsTimer = null;
+
       try {
-        // 모든 이미지가 로드될 때까지 잠깐 대기 (최대 2.5초)
+        // 모든 이미지가 로드될 때까지 잠깐 대기
         preloadAllConfiguredImages();
         await new Promise(r => setTimeout(r, 300));
 
-        // 60 FPS 스트림 캡처
-        const stream = canvas.captureStream(60);
+        // 고프레임(기본 120 FPS) 스트림 캡처
+        const stream = canvas.captureStream(targetFps);
+        const videoTrack = stream.getVideoTracks()[0];
 
-        // 지원되는 고화질 코덱 우선 선택
+        // 모니터 주사율(60Hz) 한계를 넘어 목표 FPS(예: 120fps)마다 프레임을 강제 렌더링 및 푸시
+        const frameIntervalMs = 1000 / targetFps;
+        highFpsTimer = setInterval(() => {
+          renderSceneFrame(performance.now());
+          if (videoTrack && typeof videoTrack.requestFrame === "function") {
+            try {
+              videoTrack.requestFrame();
+            } catch (_) {}
+          }
+        }, frameIntervalMs);
+
+        // .mp4 (H.264 High Profile Level 5.2 등 고프레임 호환) 코덱 최우선 선택
         const mimeCandidates = [
+          "video/mp4;codecs=avc1.640034",
+          "video/mp4;codecs=avc1.640033",
+          "video/mp4;codecs=avc1.64002a",
+          "video/mp4;codecs=avc1.42E01E",
+          "video/mp4;codecs=avc1",
+          "video/mp4;codecs=h264",
+          "video/mp4",
+          "video/webm;codecs=h264",
           "video/webm;codecs=vp9",
-          "video/webm;codecs=vp8",
-          "video/webm",
-          "video/mp4"
+          "video/webm"
         ];
         let selectedMime = "";
         for (const mime of mimeCandidates) {
@@ -1233,7 +1305,7 @@
         const chunks = [];
         const recorder = new MediaRecorder(stream, {
           mimeType: selectedMime || undefined,
-          videoBitsPerSecond: 16_000_000 // 16 Mbps 고비트레이트 (크로마키 경계선 선명도 유지)
+          videoBitsPerSecond: 28_000_000 // 28 Mbps 초고비트레이트 (고프레임 크로마키 경계선 선명도 유지)
         });
 
         recorder.ondataavailable = (e) => {
@@ -1246,30 +1318,33 @@
           recorder.onstop = resolve;
         });
 
-        // 녹화 시작 후 시퀀스 재생
-        recorder.start(100);
+        // 고빈도 타임슬라이스(33ms)로 프레임 버퍼링 손실 방지하며 녹화 시작
+        recorder.start(33);
         await runFullAnimationSequence(true);
         recorder.stop();
         await stopPromise;
 
-        // 파일 다운로드 처리
-        const ext = selectedMime.includes("mp4") ? "mp4" : "webm";
-        const blob = new Blob(chunks, { type: selectedMime || "video/webm" });
+        // .mp4 파일로 다운로드 처리
+        const blob = new Blob(chunks, { type: selectedMime || "video/mp4" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         a.href = url;
-        a.download = `tcg_hand_chromakey_${timestamp}.${ext}`;
+        a.download = `tcg_hand_chromakey_${timestamp}_${targetFps}fps.mp4`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 10000);
 
-        updateMainStatus(`인코딩 완료! 파일이 다운로드되었습니다 (.${ext})`, "bg-emerald-400");
+        updateMainStatus(`MP4 인코딩 완료! (${targetFps} FPS 영상 다운로드됨)`, "bg-emerald-400");
       } catch (err) {
         console.error("Encoding error:", err);
         updateMainStatus("인코딩 중 오류가 발생했습니다.", "bg-red-500");
       } finally {
+        if (highFpsTimer) {
+          clearInterval(highFpsTimer);
+          highFpsTimer = null;
+        }
         isEncoding = false;
         btnEncode.disabled = false;
         btnEncode.classList.remove("opacity-70", "cursor-not-allowed");
@@ -1310,8 +1385,8 @@
 
     /**
      * 단일 바(Bar) DOM 생성
-     * 구조: 애니메이션 순서 | 해당 카드 고유 번호 | 우선도(숫자) | +/-(추가/제거) | DB이미지명 | 순서 변경 | X
-     * 참고: +/-에서 -는 DB이미지명 항목이 없음
+     * 구조: 애니메이션 순서 | 해당 카드 고유 번호 | 우선도(숫자) | +/-(추가/제거) | DB이미지명 | –(마지막에 제거 추가, +항목 전용) | 순서 변경 | X
+     * 참고: +/-에서 -는 DB이미지명 항목과 별도 '–' 버튼이 없음
      */
     function createBarElement(item, index, listType) {
       const row = document.createElement("div");
@@ -1356,7 +1431,7 @@
         </div>
 
         <!-- 5. DB이미지명 (- 선택 시 항목 숨김) -->
-        <div class="col-span-3">
+        <div class="col-span-2">
           ${isMinus ? `
             <div class="text-xs text-gray-500 italic px-2 py-1.5">
               (제거 시 이미지 불필요)
@@ -1365,7 +1440,7 @@
             <div class="flex items-center gap-2">
               <div class="relative flex-1">
                 <input type="text" data-field="dbImage" value="${escapeHtml(item.dbImage)}" placeholder="숫자 (예: 101)"
-                  class="w-full pl-2.5 pr-12 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-white text-xs font-mono focus:outline-none focus:border-indigo-500" />
+                  class="w-full pl-2.5 pr-11 py-1.5 rounded-lg bg-gray-900 border border-gray-700 text-white text-xs font-mono focus:outline-none focus:border-indigo-500" />
                 <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">.webp</span>
               </div>
               <div class="w-7 h-9 rounded bg-gray-950 border border-gray-700 overflow-hidden flex-shrink-0 flex items-center justify-center" title="R2 이미지 미리보기">
@@ -1375,7 +1450,18 @@
           `}
         </div>
 
-        <!-- 6. 순서 변경 (드래그 핸들) -->
+        <!-- 6. +(추가) 항목 전용 별도 '–' 버튼 (클릭 시 마지막 리스트 위치에 해당 고유번호 제거 항목 추가) -->
+        <div class="col-span-1 flex justify-center">
+          ${!isMinus ? `
+            <button type="button" class="btn-append-remove px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 active:scale-95 text-amber-300 border border-amber-500/40 font-extrabold text-sm leading-none transition" title="가장 마지막 리스트 위치에 이 카드(고유번호: ${escapeHtml(item.uid)})를 제거하는 '-' 항목 추가">
+              –
+            </button>
+          ` : `
+            <span class="text-xs text-gray-600 select-none">·</span>
+          `}
+        </div>
+
+        <!-- 7. 순서 변경 (드래그 핸들) -->
         <div class="col-span-1 flex justify-center">
           <button type="button" class="drag-handle p-2 rounded-lg bg-gray-900 hover:bg-gray-700 text-gray-300 border border-gray-700 transition" title="꾹 누르고 위/아래로 움직여 순서 변경">
             <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1384,7 +1470,7 @@
           </button>
         </div>
 
-        <!-- 7. X (해당 바 제거) -->
+        <!-- 8. X (해당 바 제거) -->
         <div class="col-span-1 flex justify-center">
           <button type="button" class="btn-remove-bar p-2 rounded-lg bg-gray-900 hover:bg-rose-600/80 text-gray-400 hover:text-white border border-gray-700 hover:border-rose-500 transition" title="해당 바 제거">
             <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -1434,6 +1520,37 @@
           }
         });
       });
+
+      // +(추가) 항목 전용 '–' 버튼: 가장 마지막 리스트 위치(진행 카드 목록 맨 끝)에 해당 카드 고유 번호 제거 항목 추가
+      const btnAppendRemove = row.querySelector(".btn-append-remove");
+      if (btnAppendRemove) {
+        btnAppendRemove.addEventListener("click", () => {
+          const targetList = listType === "initial" ? initialCards : actionCards;
+          const currentItem = targetList.find(x => x.rowId === item.rowId) || item;
+          const targetUid = String(currentItem.uid ?? "").trim();
+          const targetPriority = Number(currentItem.priority) || 0;
+
+          actionCards.push({
+            rowId: nextRowId("act"),
+            uid: targetUid,
+            priority: targetPriority,
+            op: "-",
+            dbImage: ""
+          });
+
+          renderAllBars();
+
+          // 마지막에 추가된 바가 보이도록 스크롤 및 피드백 표시
+          const lastRow = actionBarsContainer.lastElementChild;
+          if (lastRow) {
+            lastRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            lastRow.classList.add("ring-2", "ring-amber-400");
+            setTimeout(() => lastRow.classList.remove("ring-2", "ring-amber-400"), 1200);
+          }
+
+          showModalFeedback(`✓ 고유번호 [${targetUid}] 카드를 제거하는 '-' 항목이 마지막 리스트 위치에 추가되었습니다.`);
+        });
+      }
 
       // X (해당 바 제거) 이벤트 바인딩
       row.querySelector(".btn-remove-bar").addEventListener("click", () => {
@@ -1615,6 +1732,156 @@
 
     document.getElementById("btn-close-cards").addEventListener("click", closeCardsModalAndApply);
     document.getElementById("btn-apply-cards").addEventListener("click", closeCardsModalAndApply);
+
+    /**
+     * 모달 하단 안내 메시지 일시 표시 헬퍼
+     */
+    let feedbackTimer = null;
+    function showModalFeedback(msg, isError = false) {
+      const el = document.getElementById("modal-cards-feedback");
+      if (!el) return;
+      if (feedbackTimer) clearTimeout(feedbackTimer);
+      el.className = isError ? "text-xs font-semibold text-rose-400" : "text-xs font-semibold text-emerald-400";
+      el.textContent = msg;
+      feedbackTimer = setTimeout(() => {
+        el.className = "text-xs text-gray-400";
+        el.innerHTML = "💡 <strong>순서 변경</strong>(☰)을 꾹 눌러 위/아래로 이동하거나, <strong>– 버튼</strong>을 눌러 해당 카드의 제거 항목을 맨 마지막에 바로 추가할 수 있습니다.";
+      }, 3200);
+    }
+
+    /**
+     * ==========================================
+     * 카드 목록 & 설정 JSON 내보내기 / 불러오기
+     * ==========================================
+     */
+    document.getElementById("btn-export-json").addEventListener("click", () => {
+      const exportPayload = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        r2PathMode,
+        appSettings: { ...appSettings },
+        initialCards: initialCards.map(({ uid, priority, op, dbImage }) => ({
+          uid: String(uid ?? ""),
+          priority: Number(priority) || 0,
+          op: op === "-" ? "-" : "+",
+          dbImage: op === "-" ? "" : String(dbImage ?? "")
+        })),
+        actionCards: actionCards.map(({ uid, priority, op, dbImage }) => ({
+          uid: String(uid ?? ""),
+          priority: Number(priority) || 0,
+          op: op === "-" ? "-" : "+",
+          dbImage: op === "-" ? "" : String(dbImage ?? "")
+        }))
+      };
+
+      const jsonStr = JSON.stringify(exportPayload, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      a.href = url;
+      a.download = `tcg_card_list_${timestamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      showModalFeedback("✓ 현재 카드 목록과 환경 설정이 JSON 파일로 다운로드되었습니다.");
+    });
+
+    const inputImportJson = document.getElementById("input-import-json");
+    document.getElementById("btn-import-json").addEventListener("click", () => {
+      inputImportJson.value = "";
+      inputImportJson.click();
+    });
+
+    inputImportJson.addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const parsed = JSON.parse(String(ev.target.result || "{}"));
+          if (!Array.isArray(parsed.initialCards) && !Array.isArray(parsed.actionCards)) {
+            throw new Error("유효한 카드 목록 데이터가 없습니다.");
+          }
+
+          if (Array.isArray(parsed.initialCards)) {
+            initialCards = parsed.initialCards.map((item) => ({
+              rowId: nextRowId("init"),
+              uid: String(item.uid ?? ""),
+              priority: Number(item.priority) || 0,
+              op: item.op === "-" ? "-" : "+",
+              dbImage: item.op === "-" ? "" : String(item.dbImage ?? "")
+            }));
+          }
+
+          if (Array.isArray(parsed.actionCards)) {
+            actionCards = parsed.actionCards.map((item) => ({
+              rowId: nextRowId("act"),
+              uid: String(item.uid ?? ""),
+              priority: Number(item.priority) || 0,
+              op: item.op === "-" ? "-" : "+",
+              dbImage: item.op === "-" ? "" : String(item.dbImage ?? "")
+            }));
+          }
+
+          if (parsed.r2PathMode) {
+            r2PathMode = parsed.r2PathMode;
+            selectR2PathPreset.value = r2PathMode;
+          }
+
+          // 저장된 환경 설정이 있으면 함께 복원 및 UI 동기화
+          if (parsed.appSettings && typeof parsed.appSettings === "object") {
+            const s = parsed.appSettings;
+            if (s.bgColor) applyHexColor(s.bgColor);
+            if (s.spawnDirection) {
+              updateDirectionUI(s.spawnDirection);
+              const radio = document.querySelector(`input[name="spawn-direction"][value="${s.spawnDirection}"]`);
+              if (radio) radio.checked = true;
+            }
+            if (typeof s.spawnYOffset === "number") applySpawnYOffset(s.spawnYOffset);
+            if (typeof s.handYOffset === "number") applyHandYOffset(s.handYOffset);
+            if (typeof s.isParallelHand === "boolean") applyHandMode(s.isParallelHand);
+            if (typeof s.cardSpacing === "number") applyCardSpacing(s.cardSpacing);
+            if (typeof s.anglePerCardDeg === "number") {
+              appSettings.anglePerCardDeg = s.anglePerCardDeg;
+              document.getElementById("input-fan-angle").value = String(s.anglePerCardDeg);
+            }
+            if (typeof s.maxTotalAngleDeg === "number") {
+              appSettings.maxTotalAngleDeg = s.maxTotalAngleDeg;
+              document.getElementById("input-max-fan-angle").value = String(s.maxTotalAngleDeg);
+            }
+            updateFanAngleLabels();
+            if (typeof s.pauseDurationMs === "number") {
+              appSettings.pauseDurationMs = s.pauseDurationMs;
+              const sec = s.pauseDurationMs / 1000;
+              document.getElementById("input-pause-sec").value = String(sec);
+              document.getElementById("val-pause-sec").textContent = `${sec.toFixed(2)}초`;
+            }
+            if (typeof s.cardScale === "number") {
+              appSettings.cardScale = s.cardScale;
+              document.getElementById("input-card-scale").value = String(s.cardScale);
+              document.getElementById("val-card-scale").textContent = `${s.cardScale.toFixed(2)}x`;
+            }
+            if (typeof s.encodeFps === "number") {
+              applyEncodeFps(s.encodeFps);
+            }
+          }
+
+          preloadAllConfiguredImages();
+          renderAllBars();
+          resetToInitialHandState();
+          showModalFeedback(`✓ '${file.name}' 파일에서 카드 목록을 성공적으로 불러왔습니다.`);
+          updateMainStatus("JSON 카드 목록이 적용되었습니다", "bg-emerald-400");
+        } catch (err) {
+          console.error("JSON Import Error:", err);
+          showModalFeedback("✗ JSON 파일 형식이 올바르지 않습니다.", true);
+        }
+      };
+      reader.readAsText(file, "utf-8");
+    });
 
     // 기본 카드 바 추가
     document.getElementById("btn-add-initial-bar").addEventListener("click", () => {
@@ -1848,6 +2115,27 @@
       appSettings.cardScale = scale;
       document.getElementById("val-card-scale").textContent = `${scale.toFixed(2)}x`;
       recalculateHandFanTargets(true);
+    });
+
+    // 인코딩 영상 프레임레이트(FPS) 설정 슬라이더 및 프리셋
+    const inputEncodeFps = document.getElementById("input-encode-fps");
+    const valEncodeFps = document.getElementById("val-encode-fps");
+
+    function applyEncodeFps(fpsVal) {
+      const fps = Number(fpsVal) || 120;
+      appSettings.encodeFps = fps;
+      inputEncodeFps.value = String(fps);
+      valEncodeFps.textContent = fps >= 120 ? `${fps} FPS (초고주사율)` : `${fps} FPS`;
+    }
+
+    inputEncodeFps.addEventListener("input", (e) => {
+      applyEncodeFps(e.target.value);
+    });
+
+    document.querySelectorAll(".encode-fps-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyEncodeFps(btn.dataset.fps);
+      });
     });
 
     // 미리보기 재생 및 인코딩 버튼
