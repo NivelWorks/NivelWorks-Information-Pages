@@ -79,16 +79,47 @@
   </div>
 
   <!-- ==========================================
-       우측 상단: 컨트롤 버튼 그룹 (인코딩 / 카드 목록 / 설정)
+       우측 상단: 컨트롤 버튼 그룹 (재생바 / 인코딩 / 카드 목록 / 설정)
   =========================================== -->
   <div class="fixed top-4 right-4 z-20 flex flex-wrap items-center gap-2.5">
-    <!-- 테스트 재생 버튼 (인코딩 전 눈으로 확인용) -->
-    <button id="btn-preview" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800/90 hover:bg-gray-700 active:scale-95 text-gray-100 font-medium text-sm border border-gray-600/80 shadow-lg backdrop-blur-md transition">
-      <svg class="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-      </svg>
-      <span>미리보기 재생</span>
-    </button>
+    <!-- 플레이어 컨트롤 & 재생바 (처음부터 ■ / 재생 ▶ / 일시정지 || / 순서 이동 슬라이더) -->
+    <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-700/90 shadow-lg backdrop-blur-md">
+      <!-- 처음부터(■) 정지 버튼 -->
+      <button id="btn-stop" title="처음부터 (정지 및 초기화)" class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 active:scale-95 text-gray-200 border border-gray-600/80 transition">
+        <svg class="w-3.5 h-3.5 text-rose-400" fill="currentColor" viewBox="0 0 20 20">
+          <rect x="4" y="4" width="12" height="12" rx="1.5" />
+        </svg>
+      </button>
+
+      <!-- 재생(▶) / 일시정지(||) 토글 버튼 -->
+      <button id="btn-play-pause" title="재생 / 일시정지" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow transition">
+        <span id="icon-play-pause" class="flex items-center justify-center">
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+          </svg>
+        </span>
+        <span id="label-play-pause">미리보기 재생</span>
+      </button>
+
+      <!-- 애니메이션 순서 재생바 (타임라인 슬라이더) -->
+      <div class="flex items-center gap-2 pl-2 border-l border-gray-700/80">
+        <div class="flex flex-col min-w-[150px] sm:min-w-[190px]">
+          <div class="flex items-center justify-between text-[11px] text-gray-300 font-medium mb-0.5">
+            <span class="text-gray-400">진행 순서</span>
+            <span id="timeline-step-label" class="font-mono text-indigo-300 font-semibold">0 / 2 (기본 손패)</span>
+          </div>
+          <input type="range" id="timeline-slider" min="0" max="2" step="1" value="0"
+            title="원하는 애니메이션 순서로 이동하여 즉시 재생"
+            class="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+        </div>
+
+        <!-- 빠른 순서 선택 드롭다운 -->
+        <select id="timeline-step-select" title="특정 애니메이션 순서로 즉시 이동"
+          class="px-2 py-1 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-200 font-mono focus:outline-none focus:border-indigo-500 cursor-pointer">
+          <option value="0">0: 기본</option>
+        </select>
+      </div>
+    </div>
 
     <!-- 인코딩 버튼 -->
     <button id="btn-encode" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-semibold text-sm border border-rose-400/40 shadow-lg shadow-rose-950/50 transition">
@@ -843,16 +874,29 @@
     // removingCards: 제거 애니메이션 중인 카드 배열
     let removingCards = [];
 
-    // 재생/인코딩 제어용 상태
+    // 재생/일시정지/인코딩 및 가상 타이머 제어 상태
     let isPlayingSequence = false;
+    let isPaused = false;
     let isEncoding = false;
-    let sequenceAbortController = null;
+    let currentSequenceRunId = 0; // 비동기 루프 충돌 방지용 고유 실행 ID
+    let currentStepIndex = 0;     // 0: 기본 손패, 1 ~ N: 진행 카드 목록 순서
+
+    // 일시정지(||) 시 애니메이션과 대기 타이머를 정확히 멈추기 위한 가상 스테이지 시계
+    let stageClockMs = 0;
+    let lastRealFrameMs = performance.now();
+
+    function getStageNow() {
+      return stageClockMs;
+    }
 
     /**
      * 손패를 우선도(priority) 오름차순(왼쪽 -> 오른쪽)으로 정렬하고,
      * 카드 개수에 맞춰 부채꼴 중심각과 각 카드의 목표 좌표(targetX, targetY, targetRot)를 계산합니다.
      */
     function recalculateHandFanTargets(animateSmoothly = true) {
+      // null/undefined 방어 필터링
+      handCards = handCards.filter(Boolean);
+
       // 1. 우선도(숫자) 오름차순 정렬 (동일 우선도일 경우 넣은 순서 유지)
       handCards.sort((a, b) => {
         if (a.priority !== b.priority) return a.priority - b.priority;
@@ -874,6 +918,7 @@
       const centerX = STAGE_W / 2;
       const baseY = STAGE_H - 215 - appSettings.handYOffset;
       const spacing = appSettings.cardSpacing * appSettings.cardScale;
+      const nowStage = getStageNow();
 
       handCards.forEach((card, index) => {
         // 중앙 기준 상대 인덱스 (예: 5장이면 -2, -1, 0, +1, +2)
@@ -915,7 +960,7 @@
             targetRot,
             targetScale,
             targetAlpha: 1,
-            startTime: performance.now(),
+            startTime: nowStage,
             duration: appSettings.moveDurationMs
           };
         }
@@ -925,17 +970,18 @@
     let globalInsertCounter = 0;
 
     /**
-     * 기본 카드 목록만 즉시 손패에 배치한 대기 상태로 초기화
+     * 특정 진행 순서(targetStepCompleted: 0 ~ actionCards.length)까지
+     * 애니메이션 없이 즉시 손패 상태를 계산하여 배치하는 함수
      */
-    function resetToInitialHandState() {
+    function applyHandStateUpToStep(targetStepCompleted = 0) {
       preloadAllConfiguredImages();
       handCards = [];
       stagingCard = null;
       removingCards = [];
       globalInsertCounter = 0;
 
-      // 기본 카드 목록을 순서대로 적용 (+는 추가, -는 해당 고유 번호 제거)
-      initialCards.forEach((bar) => {
+      const applyBarInstant = (bar) => {
+        if (!bar) return;
         if (bar.op === "+") {
           handCards.push({
             uid: String(bar.uid).trim(),
@@ -955,9 +1001,31 @@
             handCards.splice(targetIdx, 1);
           }
         }
-      });
+      };
+
+      // 1. 기본 카드 목록 반영
+      initialCards.forEach(applyBarInstant);
+
+      // 2. 지정된 진행 카드 목록 단계까지 즉시 반영
+      const clampedStep = Math.max(0, Math.min(actionCards.length, targetStepCompleted));
+      for (let i = 0; i < clampedStep; i++) {
+        applyBarInstant(actionCards[i]);
+      }
 
       recalculateHandFanTargets(false);
+    }
+
+    /**
+     * 진행 중인 애니메이션 루프를 안전하게 중단하고 초기 손패 상태로 리셋
+     */
+    function resetToInitialHandState() {
+      currentSequenceRunId++;
+      isPlayingSequence = false;
+      isPaused = false;
+      currentStepIndex = 0;
+      applyHandStateUpToStep(0);
+      syncPlayerControlsUI();
+      setSubStatus("");
     }
 
     /**
@@ -990,10 +1058,11 @@
     /**
      * 단일 카드 렌더링
      */
-    function drawCardObject(card, now) {
+    function drawCardObject(card, nowStage) {
+      if (!card) return;
       // 트윈 애니메이션 업데이트
       if (card.anim) {
-        const elapsed = now - card.anim.startTime;
+        const elapsed = nowStage - card.anim.startTime;
         const progress = Math.min(1, Math.max(0, elapsed / card.anim.duration));
         const eased = card.anim.easing ? card.anim.easing(progress) : easeInOutCubic(progress);
 
@@ -1051,20 +1120,33 @@
     /**
      * 캔버스 1프레임 그리기 함수 (일반 루프 및 고프레임 인코딩 타이머 공용)
      */
-    function renderSceneFrame(now) {
+    function renderSceneFrame(realNow) {
+      const dt = Math.max(0, realNow - lastRealFrameMs);
+      lastRealFrameMs = realNow;
+
+      // 일시정지 상태가 아닐 때만 스테이지 가상 시간을 전진시킴
+      if (!isPaused || isEncoding) {
+        stageClockMs += dt;
+      }
+      const nowStage = stageClockMs;
+
       // 1. 크로마키 배경색 전체 칠하기
       ctx.fillStyle = appSettings.bgColor;
       ctx.fillRect(0, 0, STAGE_W, STAGE_H);
 
       // 2. 손패 카드들 렌더링 (왼쪽부터 오른쪽 순서대로 겹치게 그림)
       for (let i = 0; i < handCards.length; i++) {
-        drawCardObject(handCards[i], now);
+        if (handCards[i]) drawCardObject(handCards[i], nowStage);
       }
 
       // 3. 제거 중인 카드 렌더링
       for (let i = removingCards.length - 1; i >= 0; i--) {
         const rc = removingCards[i];
-        drawCardObject(rc, now);
+        if (!rc) {
+          removingCards.splice(i, 1);
+          continue;
+        }
+        drawCardObject(rc, nowStage);
         if (!rc.anim && rc.alpha <= 0.01) {
           removingCards.splice(i, 1);
         }
@@ -1072,7 +1154,7 @@
 
       // 4. 등장 중인 카드(stagingCard)를 최상단에 렌더링
       if (stagingCard) {
-        drawCardObject(stagingCard, now);
+        drawCardObject(stagingCard, nowStage);
       }
     }
 
@@ -1080,34 +1162,136 @@
      * 메인 렌더링 루프
      */
     function renderLoop(now) {
-      if (!isEncoding) {
-        renderSceneFrame(now);
+      try {
+        if (!isEncoding) {
+          renderSceneFrame(now);
+        }
+      } catch (err) {
+        console.error("Render loop error recovered:", err);
       }
       requestAnimationFrame(renderLoop);
     }
 
     /**
-     * 지정 시간(ms) 대기 Promise (취소 지원)
+     * 가상 스테이지 시계 기반 대기 함수 (일시정지 시 자동으로 멈추며, runId 불일치 시 즉시 취소됨)
      */
-    function sleep(ms, signal) {
+    function waitStageMs(durationMs, runId) {
+      const startStage = getStageNow();
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(resolve, ms);
-        if (signal) {
-          signal.addEventListener("abort", () => {
-            clearTimeout(timer);
+        function check() {
+          if (runId !== currentSequenceRunId) {
             reject(new Error("Aborted"));
-          }, { once: true });
+            return;
+          }
+          if (getStageNow() - startStage >= durationMs) {
+            resolve();
+            return;
+          }
+          setTimeout(check, 16);
         }
+        check();
       });
+    }
+
+    /**
+     * 재생바(타임라인) 및 재생/일시정지 버튼 UI 동기화
+     */
+    function syncPlayerControlsUI() {
+      const slider = document.getElementById("timeline-slider");
+      const stepLabel = document.getElementById("timeline-step-label");
+      const stepSelect = document.getElementById("timeline-step-select");
+      const iconPlayPause = document.getElementById("icon-play-pause");
+      const labelPlayPause = document.getElementById("label-play-pause");
+      const btnPlayPause = document.getElementById("btn-play-pause");
+
+      const total = actionCards.length;
+      if (slider) {
+        slider.max = String(total);
+        slider.value = String(Math.min(currentStepIndex, total));
+      }
+
+      if (stepLabel) {
+        if (currentStepIndex === 0) {
+          stepLabel.textContent = `0 / ${total} (기본 손패)`;
+        } else {
+          const bar = actionCards[currentStepIndex - 1];
+          const opText = bar ? (bar.op === "+" ? `+추가(#${bar.uid})` : `-제거(#${bar.uid})`) : "";
+          stepLabel.textContent = `순서 ${currentStepIndex} / ${total} ${opText}`;
+        }
+      }
+
+      if (stepSelect) {
+        // 옵션 목록 최신화
+        const desiredCount = total + 1;
+        if (stepSelect.options.length !== desiredCount) {
+          stepSelect.innerHTML = "";
+          const opt0 = document.createElement("option");
+          opt0.value = "0";
+          opt0.textContent = "0: 기본 손패";
+          stepSelect.appendChild(opt0);
+
+          actionCards.forEach((bar, idx) => {
+            const opt = document.createElement("option");
+            opt.value = String(idx + 1);
+            opt.textContent = `${idx + 1}번: ${bar.op === "+" ? "+" : "-"} (고유:${bar.uid})`;
+            stepSelect.appendChild(opt);
+          });
+        } else {
+          // 텍스트만 업데이트
+          for (let i = 0; i < actionCards.length; i++) {
+            const bar = actionCards[i];
+            const opt = stepSelect.options[i + 1];
+            if (opt) {
+              opt.textContent = `${i + 1}번: ${bar.op === "+" ? "+" : "-"} (고유:${bar.uid})`;
+            }
+          }
+        }
+        stepSelect.value = String(Math.min(currentStepIndex, total));
+      }
+
+      // 재생 / 일시정지 버튼 아이콘 및 색상 변경
+      if (isPlayingSequence && !isPaused) {
+        // 재생 중 -> 일시정지(||) 표시
+        btnPlayPause.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-95 text-gray-950 font-bold text-xs shadow transition";
+        iconPlayPause.innerHTML = `
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M5.5 3.5A1.5 1.5 0 017 5v10a1.5 1.5 0 01-3 0V5a1.5 1.5 0 011.5-1.5zm9 0A1.5 1.5 0 0116 5v10a1.5 1.5 0 01-3 0V5a1.5 1.5 0 011.5-1.5z" clip-rule="evenodd" />
+          </svg>
+        `;
+        labelPlayPause.textContent = "일시정지";
+      } else if (isPlayingSequence && isPaused) {
+        // 일시정지 중 -> 이어서 재생(▶) 표시
+        btnPlayPause.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow transition";
+        iconPlayPause.innerHTML = `
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+          </svg>
+        `;
+        labelPlayPause.textContent = "이어서 재생";
+      } else {
+        // 대기 중 -> 미리보기 재생(▶) 표시
+        btnPlayPause.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow transition";
+        iconPlayPause.innerHTML = `
+          <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+          </svg>
+        `;
+        labelPlayPause.textContent = "미리보기 재생";
+      }
     }
 
     /**
      * 단일 카드 액션(+ 추가 또는 - 제거) 애니메이션 실행
      */
-    async function executeCardStep(bar, stepIndex, totalSteps, signal) {
+    async function executeCardStep(bar, stepIndex, totalSteps, runId) {
+      if (runId !== currentSequenceRunId) throw new Error("Aborted");
+
       const uid = String(bar.uid).trim();
       const priority = Number(bar.priority) || 0;
       const dbImage = String(bar.dbImage).trim();
+
+      currentStepIndex = stepIndex;
+      syncPlayerControlsUI();
 
       if (bar.op === "+") {
         setSubStatus(`진행 [${stepIndex}/${totalSteps}]: 카드 추가 (고유번호: ${uid}, 우선도: ${priority}, 이미지: ${dbImage}.webp)`);
@@ -1119,7 +1303,7 @@
 
         // 1단계: 설정된 방향(우측/좌측) 및 설정된 상하 높이에서 등장
         const enterDuration = 450;
-        stagingCard = {
+        const activeCard = {
           uid,
           priority,
           dbImage,
@@ -1140,30 +1324,34 @@
             targetRot: 0,
             targetScale: appSettings.cardScale * 1.18,
             targetAlpha: 1,
-            startTime: performance.now(),
+            startTime: getStageNow(),
             duration: enterDuration,
             easing: easeOutCubic
           }
         };
+        stagingCard = activeCard;
 
-        await sleep(enterDuration, signal);
+        await waitStageMs(enterDuration, runId);
 
         // 2단계: 잠시 멈춤
-        await sleep(appSettings.pauseDurationMs, signal);
+        await waitStageMs(appSettings.pauseDurationMs, runId);
+
+        if (runId !== currentSequenceRunId) throw new Error("Aborted");
 
         // 3단계: 손패 배열에 넣고 우선도에 따라 오름차순 정렬된 자리로 이동
-        const joiningCard = stagingCard;
         stagingCard = null;
-        handCards.push(joiningCard);
+        if (activeCard) {
+          handCards.push(activeCard);
+        }
         recalculateHandFanTargets(true);
 
-        await sleep(appSettings.moveDurationMs + 250, signal);
+        await waitStageMs(appSettings.moveDurationMs + 250, runId);
 
       } else if (bar.op === "-") {
         setSubStatus(`진행 [${stepIndex}/${totalSteps}]: 카드 제거 (고유번호: ${uid})`);
 
         // 해당 카드 고유 번호(uid)로 손패에서 찾기
-        const targetIdx = handCards.findIndex(c => c.uid === uid);
+        const targetIdx = handCards.findIndex(c => c && c.uid === uid);
         if (targetIdx !== -1) {
           const [removed] = handCards.splice(targetIdx, 1);
           const removeDuration = 520;
@@ -1178,7 +1366,7 @@
             targetRot: removed.rot * 0.3,
             targetScale: removed.scale * 1.08,
             targetAlpha: 0,
-            startTime: performance.now(),
+            startTime: getStageNow(),
             duration: removeDuration,
             easing: easeOutCubic
           };
@@ -1186,54 +1374,105 @@
 
           // 남은 손패 카드들의 부채꼴 중심각 및 위치 즉시 재정렬
           recalculateHandFanTargets(true);
-          await sleep(Math.max(removeDuration, appSettings.moveDurationMs) + 250, signal);
+          await waitStageMs(Math.max(removeDuration, appSettings.moveDurationMs) + 250, runId);
         } else {
           setSubStatus(`진행 [${stepIndex}/${totalSteps}]: 고유번호 [${uid}] 카드를 손패에서 찾지 못해 건너뜁니다.`);
-          await sleep(400, signal);
+          await waitStageMs(400, runId);
         }
       }
     }
 
     /**
-     * 전체 시퀀스 실행 (기본 카드 목록 배치 -> 진행 카드 목록 순차 실행)
+     * 전체 또는 지정한 순서(startFromStep: 1 ~ actionCards.length, 0이면 처음부터)부터 시퀀스 실행
      */
-    async function runFullAnimationSequence(forEncoding = false) {
-      if (isPlayingSequence) {
-        if (sequenceAbortController) sequenceAbortController.abort();
-      }
-
-      sequenceAbortController = new AbortController();
-      const signal = sequenceAbortController.signal;
+    async function runFullAnimationSequence(forEncoding = false, startFromStep = 0) {
+      const myRunId = ++currentSequenceRunId;
       isPlayingSequence = true;
+      isPaused = false;
 
       try {
-        // 1. 기본 카드 목록 상태로 초기화
-        resetToInitialHandState();
-        updateMainStatus(
-          forEncoding ? "영상 인코딩 녹화 중..." : "미리보기 애니메이션 재생 중...",
-          forEncoding ? "bg-rose-500 animate-ping" : "bg-amber-400 animate-pulse"
-        );
+        const startIdx = Math.max(0, Math.min(actionCards.length, Number(startFromStep) || 0));
 
-        // 시작 홀드 (0.8초)
-        await sleep(800, signal);
+        if (startIdx === 0) {
+          // 처음(0단계: 기본 카드 목록)부터 시작
+          currentStepIndex = 0;
+          applyHandStateUpToStep(0);
+          syncPlayerControlsUI();
+          updateMainStatus(
+            forEncoding ? "영상 인코딩 녹화 중..." : "미리보기 애니메이션 재생 중...",
+            forEncoding ? "bg-rose-500 animate-ping" : "bg-amber-400 animate-pulse"
+          );
+          // 시작 홀드 (0.8초)
+          await waitStageMs(800, myRunId);
+        } else {
+          // 특정 애니메이션 순서(startIdx)부터 즉시 재생: 이전 단계(startIdx - 1)까지 손패에 선반영
+          currentStepIndex = startIdx;
+          applyHandStateUpToStep(startIdx - 1);
+          syncPlayerControlsUI();
+          updateMainStatus(
+            `순서 ${startIdx}번부터 미리보기 재생 중...`,
+            "bg-amber-400 animate-pulse"
+          );
+          await waitStageMs(250, myRunId);
+        }
 
-        // 2. 진행 카드 목록 순서대로 실행
-        for (let i = 0; i < actionCards.length; i++) {
-          await executeCardStep(actionCards[i], i + 1, actionCards.length, signal);
+        // 진행 카드 목록 순서대로 실행
+        const loopStart = startIdx === 0 ? 0 : startIdx - 1;
+        for (let i = loopStart; i < actionCards.length; i++) {
+          await executeCardStep(actionCards[i], i + 1, actionCards.length, myRunId);
         }
 
         // 종료 전 여유 홀드 (1.0초)
         setSubStatus("모든 진행 카드 연출 완료 (마무리 프레임 유지 중)");
-        await sleep(1000, signal);
+        await waitStageMs(1000, myRunId);
 
-        updateMainStatus("완료 (현재 최종 손패 상태)", "bg-emerald-400");
-        setSubStatus("");
+        if (myRunId === currentSequenceRunId) {
+          isPlayingSequence = false;
+          isPaused = false;
+          syncPlayerControlsUI();
+          updateMainStatus("완료 (현재 최종 손패 상태)", "bg-emerald-400");
+          setSubStatus("");
+        }
       } catch (err) {
         if (err.message !== "Aborted") {
           console.error(err);
         }
       } finally {
+        if (myRunId === currentSequenceRunId) {
+          isPlayingSequence = false;
+          syncPlayerControlsUI();
+        }
+      }
+    }
+
+    /**
+     * 재생바(슬라이더/드롭다운)로 특정 애니메이션 순서로 즉시 이동 및 재생
+     */
+    function seekToAnimationStep(stepNumber, autoPlay = true) {
+      if (isEncoding) return;
+      const step = Math.max(0, Math.min(actionCards.length, Number(stepNumber) || 0));
+
+      if (step === 0) {
+        if (autoPlay && actionCards.length > 0) {
+          runFullAnimationSequence(false, 0);
+        } else {
+          resetToInitialHandState();
+          updateMainStatus("기본 손패 상태 (0번 순서)", "bg-emerald-400");
+        }
+        return;
+      }
+
+      if (autoPlay) {
+        runFullAnimationSequence(false, step);
+      } else {
+        // 일시정지 상태로 해당 순서 직후 손패 확인
+        currentSequenceRunId++;
         isPlayingSequence = false;
+        isPaused = false;
+        currentStepIndex = step;
+        applyHandStateUpToStep(step);
+        syncPlayerControlsUI();
+        updateMainStatus(`순서 ${step}번 반영 상태`, "bg-indigo-400");
       }
     }
 
@@ -1587,6 +1826,8 @@
       actionCards.forEach((item, idx) => {
         actionBarsContainer.appendChild(createBarElement(item, idx, "action"));
       });
+
+      syncPlayerControlsUI();
     }
 
     /**
@@ -1663,6 +1904,7 @@
       } else {
         actionCards = reordered;
       }
+      syncPlayerControlsUI();
     }
 
     /**
@@ -1673,8 +1915,12 @@
     const modalCards = document.getElementById("modal-cards");
     const modalSettings = document.getElementById("modal-settings");
 
-    // 카드 목록 모달 열기
+    // 카드 목록 모달 열기 (재생 중이었다면 안전하게 일시정지/초기화하여 충돌 방지)
     document.getElementById("btn-open-cards").addEventListener("click", () => {
+      if (isPlayingSequence && !isEncoding) {
+        resetToInitialHandState();
+        updateMainStatus("카드 목록 편집 중 (재생이 초기화되었습니다)", "bg-indigo-400");
+      }
       renderAllBars();
       modalCards.classList.remove("hidden");
       modalCards.classList.add("flex");
@@ -2138,10 +2384,67 @@
       });
     });
 
-    // 미리보기 재생 및 인코딩 버튼
-    document.getElementById("btn-preview").addEventListener("click", () => {
+    // 플레이어 컨트롤: 재생(▶) / 일시정지(||) 버튼
+    document.getElementById("btn-play-pause").addEventListener("click", () => {
       if (isEncoding) return;
-      runFullAnimationSequence(false);
+
+      if (!isPlayingSequence) {
+        // 재생 중이 아닐 때: 만약 마지막 순서까지 끝난 상태라면 처음(0)부터, 아니면 선택된 순서부터 재생
+        const startStep = (currentStepIndex > 0 && currentStepIndex < actionCards.length)
+          ? currentStepIndex
+          : 0;
+        runFullAnimationSequence(false, startStep);
+      } else if (!isPaused) {
+        // 재생 중일 때 -> 일시정지(||)
+        isPaused = true;
+        syncPlayerControlsUI();
+        updateMainStatus(`일시정지됨 (순서 ${currentStepIndex} / ${actionCards.length})`, "bg-amber-400");
+      } else {
+        // 일시정지 상태일 때 -> 이어서 재생(▶)
+        isPaused = false;
+        syncPlayerControlsUI();
+        updateMainStatus(`미리보기 애니메이션 재생 중... (순서 ${currentStepIndex} / ${actionCards.length})`, "bg-amber-400 animate-pulse");
+      }
+    });
+
+    // 플레이어 컨트롤: 처음부터(■) 정지 버튼
+    document.getElementById("btn-stop").addEventListener("click", () => {
+      if (isEncoding) return;
+      resetToInitialHandState();
+      updateMainStatus("정지됨 (처음 기본 손패 상태)", "bg-emerald-400");
+    });
+
+    // 재생바 슬라이더: 드래그하는 동안 해당 순서 미리보기 표시, 손을 떼면 즉시 그 순서부터 재생
+    const timelineSlider = document.getElementById("timeline-slider");
+    const timelineStepSelect = document.getElementById("timeline-step-select");
+
+    timelineSlider.addEventListener("input", (e) => {
+      if (isEncoding) return;
+      const step = Number(e.target.value) || 0;
+      // 드래그 중에는 이전 단계까지 손패 상태를 즉시 보여줌
+      currentSequenceRunId++;
+      isPlayingSequence = false;
+      isPaused = false;
+      currentStepIndex = step;
+      applyHandStateUpToStep(step === 0 ? 0 : step - 1);
+      syncPlayerControlsUI();
+      updateMainStatus(
+        step === 0 ? "기본 손패 위치로 이동" : `순서 ${step}번 시작 지점으로 이동 (놓으면 재생)`,
+        "bg-indigo-400"
+      );
+    });
+
+    timelineSlider.addEventListener("change", (e) => {
+      if (isEncoding) return;
+      const step = Number(e.target.value) || 0;
+      seekToAnimationStep(step, step > 0);
+    });
+
+    // 빠른 순서 선택 드롭다운: 선택 즉시 해당 애니메이션 순서부터 재생
+    timelineStepSelect.addEventListener("change", (e) => {
+      if (isEncoding) return;
+      const step = Number(e.target.value) || 0;
+      seekToAnimationStep(step, step > 0);
     });
 
     document.getElementById("btn-encode").addEventListener("click", () => {
